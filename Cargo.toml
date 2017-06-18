@@ -1,6 +1,8 @@
 [package]
 name = "id-set"
+description = "Set of IDs."
+documentation = "https://docs.rs/id-map/0.1.0/id_set"
+repository = "https://github.com/andrewhickman/id-set"
+license = "MIT"
 version = "0.1.0"
-authors = ["andre <andrew.hickman1@sky.com>"]
-
-[dependencies]
+authors = ["Andrew Hickman <andrew.hickman1@sky.com>"]
