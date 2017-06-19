@@ -41,8 +41,15 @@ fn iterator() {
     let long: IdSet = (0..10000).filter(|&n| n % 2 == 0).collect();
     let real: Vec<_> = (0..10000/2).map(|x| x*2).collect();
 
-    let idxs: Vec<_> = long.iter().collect();
-    assert_eq!(idxs, real);
+    let ids: Vec<_> = long.iter().collect();
+    assert_eq!(ids, real);
+
+    let mut x = 0;
+    let long: IdSet = (1..1000).map(|n| { x += 2*n - 1; x }).collect();
+    let real: Vec<_> = (1..1000).map(|n| n*n).collect();
+
+    let ids: Vec<_> = long.iter().collect();
+    assert_eq!(ids, real);
 }
 
 #[test]

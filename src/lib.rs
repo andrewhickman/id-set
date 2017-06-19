@@ -1,6 +1,6 @@
 #[cfg(test)] mod tests;
 
-use std::fmt;
+use std::{fmt, slice};
 use std::iter::FromIterator;
 
 pub type Id = usize;
@@ -123,9 +123,11 @@ impl IdSet {
 
     pub fn iter(&self) -> Iter {
         Iter {
-            storage: &self.storage,
+            storage: self.storage.iter(),
+            len: self.len,
             word: 0,
-            bit: 0,
+            mask: 0,
+            id: 0,
         }
     }
 }
@@ -214,11 +216,13 @@ impl<'a> IntoIterator for &'a IdSet {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct Iter<'a> {
-    storage: &'a [u32],
-    word: usize,
-    bit: usize,
+    storage: slice::Iter<'a, u32>,
+    len: usize, // the number of remaining set bits.
+    word: u32,  // 
+    mask: u32,
+    id: Id,
 }
 
 impl<'a> Iterator for Iter<'a> {
@@ -226,28 +230,36 @@ impl<'a> Iterator for Iter<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            if self.bit == BITS {
+            if self.mask == 0 {
                 loop {
-                    if self.word + 1 == self.storage.len() {
-                        return None
-                    }
-                    self.word += 1;
-
-                    if self.storage[self.word] != 0 {
+                    self.word = match self.storage.next() {
+                        Some(&word) => word,
+                        None => return None,
+                    };
+                    if self.word != 0 {
                         break;
                     }
+                    self.id += BITS;
                 }
-                self.bit = 0;
+                self.mask = 1;
             }
-            let bit = self.bit;
-            self.bit += 1;
-            if (self.storage[self.word] & (1 << bit)) != 0 {
-                return Some(self.word * BITS + bit)
+            let bit = self.word & self.mask;
+            self.mask <<= 1;
+            self.id += 1;
+            if bit != 0 {
+                self.len -= 1;
+                return Some(self.id - 1);
             }
         }
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (0, Some((self.storage.len() - self.word) * BITS - self.bit))
+        (self.len, Some(self.len))
+    }
+}
+
+impl<'a> ExactSizeIterator for Iter<'a> {
+    fn len(&self) -> usize {
+        self.len
     }
 }
