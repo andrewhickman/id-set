@@ -48,7 +48,7 @@ fn iterator() {
     let long: IdSet = (1..1000).map(|n| { x += 2*n - 1; x }).collect();
     let real: Vec<_> = (1..1000).map(|n| n*n).collect();
 
-    let ids: Vec<_> = long.iter().collect();
+    let ids: Vec<_> = long.into_iter().collect();
     assert_eq!(ids, real);
 }
 
@@ -98,8 +98,24 @@ fn eq() {
 
 #[test]
 fn from_bytes() {
-    let a = IdSet::from_bytes(&[0b01101001, 0b10010110, 0b10010110, 0b01101001]);
-    let b: IdSet = (0usize..32usize).filter(|&n| n.count_ones() % 2 == 0).collect();
+    let a = IdSet::from_bytes(&[0b01101001]);
+    
+    assert!(a.contains(0));
+    assert!(!a.contains(1));
+    assert!(!a.contains(2));
+    assert!(a.contains(3));
+    assert!(!a.contains(4));
+    assert!(a.contains(5));
+    assert!(a.contains(6));
+    assert!(!a.contains(7));
+}
 
-    assert!(a == b);
+#[test]
+fn retain() {
+    let mut a = IdSet::new_filled(10);
+    let b: IdSet = (0..5).map(|id| id * 2).collect();
+
+    a.retain(|id| id % 2 == 0);
+
+    assert_eq!(a, b);
 }

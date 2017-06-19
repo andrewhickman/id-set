@@ -1,8 +1,9 @@
 [package]
 name = "id-set"
-description = "Bitset implementation."
-documentation = "https://docs.rs/id-set/0.1.2/id_set"
+description = "A bitset implementation"
+documentation = "https://docs.rs/id-set/"
 repository = "https://github.com/andrewhickman/id-set"
 license = "MIT"
-version = "0.1.2"
+version = "0.1.3"
+keywords = ["data-structures", "bitset"]
 authors = ["Andrew Hickman <andrew.hickman1@sky.com>"]

@@ -1,8 +1,14 @@
+//! A bit-set implementation for use in id-map. Notable differences from bit-set are the IntoIter
+//! struct and retain() methods.
+
+#![deny(missing_docs)]
+
 #[cfg(test)] mod tests;
 
-use std::{fmt, slice};
+use std::{fmt, slice, vec};
 use std::iter::FromIterator;
 
+/// The element type of the set.
 pub type Id = usize;
 
 type Block = u32;
@@ -17,12 +23,15 @@ fn ceil_div(n: usize, k: usize) -> usize {
     }
 }
 
+/// A set of `usize` elements represented by a bit vector. Storage required is proportional to the
+/// maximum element in the set.
 pub struct IdSet {
     storage: Vec<Block>,
     len: usize,
 }
 
 impl IdSet {
+    /// Creates an empty `IdSet`.
     pub fn new() -> Self {
         IdSet {
             storage: Vec::new(),
@@ -30,49 +39,46 @@ impl IdSet {
         }
     }
 
-    pub fn new_filled(len: usize) -> Self {
-        let (nwords, nbits) = (len / BITS, len % BITS);
+    /// Creates a `IdSet` filled with all elements from 0 to n.
+    pub fn new_filled(n: usize) -> Self {
+        let (nwords, nbits) = (n / BITS, n % BITS);
         let mut storage = vec![!0; nwords];
         if nbits != 0 {
             storage.push((1u32 << nbits) - 1);
         }
         IdSet {
             storage,
-            len,
+            len: n,
         }
     }
 
-    pub fn with_capacity(nbits: usize) -> Self {
+    /// Creates a empty `IdSet` that can hold elements up to n before reallocating.
+    pub fn with_capacity(n: usize) -> Self {
         IdSet {
-            storage: Vec::with_capacity(ceil_div(nbits, BITS)),
+            storage: Vec::with_capacity(ceil_div(n, BITS)),
             len: 0,
         }
     }
 
-    pub fn from_bytes(bytes: &[u8]) -> Self {
-        let mut storage = Vec::with_capacity(ceil_div(bytes.len(), 8));
-        let mut len = 0;
-        for chunk in bytes.chunks(4) {
-            let mut word = 0;
-            for &byte in chunk {
-                word <<= 8;
-                word |= byte as u32;
-            }
-            len += word.count_ones() as usize;
-            storage.push(word);
-        }
+    /// Creates a set from a raw set of bytes.
+    pub fn from_bytes(bytes: &[u32]) -> Self {
+        let storage = Vec::from(bytes);
+        let len = bytes.iter().map(|&word| word.count_ones() as usize).sum();
         IdSet { storage, len }
     }
-
+    
+    /// Returns the number of elements in the set.
     pub fn len(&self) -> usize {
         self.len
     }
 
+    /// Removes all elements from the set.
     pub fn clear(&mut self) {
         self.storage.clear();
         self.len = 0;
     }
 
+    /// Inserts the given elements into the set, returning true if it was not already in the set.
     pub fn insert(&mut self, id: Id) -> bool {
         let (word, bit) = (id / BITS, id % BITS);
         let mask = 1 << bit;
@@ -93,6 +99,7 @@ impl IdSet {
         }
     }
 
+    /// Removes the given element from the set, returning true if it was in the set.
     pub fn remove(&mut self, id: Id) -> bool {
         let (word, bit) = (id / BITS, id % BITS);
         let mask = 1 << bit;
@@ -110,6 +117,7 @@ impl IdSet {
         }
     }
 
+    /// Returns true if the given element is in the set.
     pub fn contains(&self, id: Id) -> bool {
         let (word, bit) = (id / BITS, id % BITS);
         let mask = 1 << bit;
@@ -121,9 +129,36 @@ impl IdSet {
         }
     }
 
+    /// Remove all elements that don't satisfy the predicate.
+    pub fn retain<F: FnMut(Id) -> bool>(&mut self, mut pred: F) {
+        let mut id = 0;
+        for word in &mut self.storage {
+            for bit in 0..BITS {
+                let mask = 1 << bit;
+                if (*word & mask) != 0 && !pred(id) {
+                    self.len -= 1;
+                    *word &= !mask;
+                }
+                id += 1;
+            }
+        }
+    }
+
+    /// An iterator over all elements in increasing order.
     pub fn iter(&self) -> Iter {
         Iter {
             storage: self.storage.iter(),
+            len: self.len,
+            word: 0,
+            mask: 0,
+            id: 0,
+        }
+    }
+
+    /// A consuming iterator over all elements in increasing order.
+    pub fn into_iter(self) -> IntoIter {
+        IntoIter {
+            storage: self.storage.into_iter(),
             len: self.len,
             word: 0,
             mask: 0,
@@ -217,10 +252,11 @@ impl<'a> IntoIterator for &'a IdSet {
 }
 
 #[derive(Clone, Debug)]
+/// An iterator over all elements in increasing order.
 pub struct Iter<'a> {
     storage: slice::Iter<'a, u32>,
-    len: usize, // the number of remaining set bits.
-    word: u32,  // 
+    len: usize,
+    word: u32, 
     mask: u32,
     id: Id,
 }
@@ -229,6 +265,9 @@ impl<'a> Iterator for Iter<'a> {
     type Item = Id;
 
     fn next(&mut self) -> Option<Self::Item> {
+        if self.len == 0 {
+            return None;
+        }
         loop {
             if self.mask == 0 {
                 loop {
@@ -259,6 +298,58 @@ impl<'a> Iterator for Iter<'a> {
 }
 
 impl<'a> ExactSizeIterator for Iter<'a> {
+    fn len(&self) -> usize {
+        self.len
+    }
+}
+
+#[derive(Clone, Debug)]
+/// A consuming iterator over all elements in increasing order.
+pub struct IntoIter {
+    storage: vec::IntoIter<u32>,
+    len: usize,
+    word: u32, 
+    mask: u32,
+    id: Id,
+}
+
+impl Iterator for IntoIter {
+    type Item = Id;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.len == 0 {
+            return None;
+        }
+        loop {
+            if self.mask == 0 {
+                loop {
+                    self.word = match self.storage.next() {
+                        Some(word) => word,
+                        None => return None,
+                    };
+                    if self.word != 0 {
+                        break;
+                    }
+                    self.id += BITS;
+                }
+                self.mask = 1;
+            }
+            let bit = self.word & self.mask;
+            self.mask <<= 1;
+            self.id += 1;
+            if bit != 0 {
+                self.len -= 1;
+                return Some(self.id - 1);
+            }
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.len, Some(self.len))
+    }
+}
+
+impl ExactSizeIterator for IntoIter {
     fn len(&self) -> usize {
         self.len
     }
