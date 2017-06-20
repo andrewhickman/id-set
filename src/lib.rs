@@ -31,6 +31,7 @@ pub struct IdSet {
 }
 
 impl IdSet {
+    #[inline]
     /// Creates an empty `IdSet`.
     pub fn new() -> Self {
         IdSet {
@@ -40,6 +41,7 @@ impl IdSet {
     }
 
     /// Creates a `IdSet` filled with all elements from 0 to n.
+    #[inline]
     pub fn new_filled(n: usize) -> Self {
         let (nwords, nbits) = (n / BITS, n % BITS);
         let mut storage = vec![!0; nwords];
@@ -53,6 +55,7 @@ impl IdSet {
     }
 
     /// Creates a empty `IdSet` that can hold elements up to n before reallocating.
+    #[inline]
     pub fn with_capacity(n: usize) -> Self {
         IdSet {
             storage: Vec::with_capacity(ceil_div(n, BITS)),
@@ -61,6 +64,7 @@ impl IdSet {
     }
 
     /// Creates a set from a raw set of bytes.
+    #[inline]
     pub fn from_bytes(bytes: &[u32]) -> Self {
         let storage = Vec::from(bytes);
         let len = bytes.iter().map(|&word| word.count_ones() as usize).sum();
@@ -68,11 +72,13 @@ impl IdSet {
     }
     
     /// Returns the number of elements in the set.
+    #[inline]
     pub fn len(&self) -> usize {
         self.len
     }
 
     /// Removes all elements from the set.
+    #[inline]
     pub fn clear(&mut self) {
         self.storage.clear();
         self.len = 0;
@@ -145,6 +151,7 @@ impl IdSet {
     }
 
     /// An iterator over all elements in increasing order.
+    #[inline]
     pub fn iter(&self) -> Iter {
         let mut storage = self.storage.iter();
         let &word = storage.next().unwrap_or(&0);
@@ -157,6 +164,7 @@ impl IdSet {
     }
 
     /// A consuming iterator over all elements in increasing order.
+    #[inline]
     pub fn into_iter(self) -> IntoIter {
         let mut storage = self.storage.into_iter();
         let word = storage.next().unwrap_or(0);
@@ -170,6 +178,7 @@ impl IdSet {
 }
 
 impl Clone for IdSet {
+    #[inline]
     fn clone(&self) -> Self {
         IdSet {
             storage: self.storage.clone(),
@@ -177,6 +186,7 @@ impl Clone for IdSet {
         }
     }
 
+    #[inline]
     fn clone_from(&mut self, source: &Self) {
         self.storage.clone_from(&source.storage);
         self.len = source.len;
@@ -198,6 +208,7 @@ impl fmt::Debug for IdSet {
 }
 
 impl Default for IdSet {
+    #[inline]
     fn default() -> Self {
         IdSet::new()
     }
@@ -227,6 +238,7 @@ impl PartialEq for IdSet {
 }
 
 impl Extend<Id> for IdSet {
+    #[inline]
     fn extend<I: IntoIterator<Item = Id>>(&mut self, iter: I) {
         for id in iter {
             self.insert(id);
@@ -235,6 +247,7 @@ impl Extend<Id> for IdSet {
 }
 
 impl FromIterator<Id> for IdSet {
+    #[inline]
     fn from_iter<I: IntoIterator<Item = Id>>(iter: I) -> Self {
         let mut set = IdSet::new();
         for id in iter {
@@ -248,6 +261,7 @@ impl<'a> IntoIterator for &'a IdSet {
     type Item = Id;
     type IntoIter = Iter<'a>;
 
+    #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
@@ -265,6 +279,7 @@ pub struct Iter<'a> {
 impl<'a> Iterator for Iter<'a> {
     type Item = Id;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         while self.word == 0 {
             match self.storage.next() {
@@ -280,12 +295,14 @@ impl<'a> Iterator for Iter<'a> {
         Some(self.idx + bit.count_ones() as usize)
     }
 
+    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         (self.len, Some(self.len))
     }
 }
 
 impl<'a> ExactSizeIterator for Iter<'a> {
+    #[inline]
     fn len(&self) -> usize {
         self.len
     }
@@ -303,6 +320,7 @@ pub struct IntoIter {
 impl Iterator for IntoIter {
     type Item = Id;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         while self.word == 0 {
             match self.storage.next() {
@@ -318,12 +336,14 @@ impl Iterator for IntoIter {
         Some(self.idx + bit.count_ones() as usize)
     }
 
+    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         (self.len, Some(self.len))
     }
 }
 
 impl ExactSizeIterator for IntoIter {
+    #[inline]
     fn len(&self) -> usize {
         self.len
     }
