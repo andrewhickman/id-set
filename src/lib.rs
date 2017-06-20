@@ -150,8 +150,7 @@ impl IdSet {
             storage: self.storage.iter(),
             len: self.len,
             word: 0,
-            mask: 0,
-            id: 0,
+            idx: 0,
         }
     }
 
@@ -161,8 +160,7 @@ impl IdSet {
             storage: self.storage.into_iter(),
             len: self.len,
             word: 0,
-            mask: 0,
-            id: 0,
+            idx: 0,
         }
     }
 }
@@ -257,39 +255,25 @@ pub struct Iter<'a> {
     storage: slice::Iter<'a, u32>,
     len: usize,
     word: u32, 
-    mask: u32,
-    id: Id,
+    idx: usize,
 }
 
 impl<'a> Iterator for Iter<'a> {
     type Item = Id;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.len == 0 {
-            return None;
-        }
-        loop {
-            if self.mask == 0 {
-                loop {
-                    self.word = match self.storage.next() {
-                        Some(&word) => word,
-                        None => return None,
-                    };
-                    if self.word != 0 {
-                        break;
-                    }
-                    self.id += BITS;
-                }
-                self.mask = 1;
+        while self.word == 0 {
+            match self.storage.next() {
+                Some(&word) => self.word = word,
+                None => return None,
             }
-            let bit = self.word & self.mask;
-            self.mask <<= 1;
-            self.id += 1;
-            if bit != 0 {
-                self.len -= 1;
-                return Some(self.id - 1);
-            }
+            self.idx += BITS;
         }
+        // remove the LSB of the current word
+        let bit = (self.word & (!self.word + 1)) - 1;
+        self.word &= self.word - 1;
+        self.len -= 1;
+        Some(self.idx + bit.count_ones() as usize)
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -309,39 +293,25 @@ pub struct IntoIter {
     storage: vec::IntoIter<u32>,
     len: usize,
     word: u32, 
-    mask: u32,
-    id: Id,
+    idx: usize,
 }
 
 impl Iterator for IntoIter {
     type Item = Id;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.len == 0 {
-            return None;
-        }
-        loop {
-            if self.mask == 0 {
-                loop {
-                    self.word = match self.storage.next() {
-                        Some(word) => word,
-                        None => return None,
-                    };
-                    if self.word != 0 {
-                        break;
-                    }
-                    self.id += BITS;
-                }
-                self.mask = 1;
+        while self.word == 0 {
+            match self.storage.next() {
+                Some(&word) => self.word = word,
+                None => return None,
             }
-            let bit = self.word & self.mask;
-            self.mask <<= 1;
-            self.id += 1;
-            if bit != 0 {
-                self.len -= 1;
-                return Some(self.id - 1);
-            }
+            self.idx += BITS;
         }
+        // remove the LSB of the current word
+        let bit = (self.word & (!self.word + 1)) - 1;
+        self.word &= self.word - 1;
+        self.len -= 1;
+        Some(self.idx + bit.count_ones() as usize)
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
