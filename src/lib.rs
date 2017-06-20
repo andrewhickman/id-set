@@ -146,20 +146,24 @@ impl IdSet {
 
     /// An iterator over all elements in increasing order.
     pub fn iter(&self) -> Iter {
+        let mut storage = self.storage.iter();
+        let &word = storage.next().unwrap_or(&0);
         Iter {
-            storage: self.storage.iter(),
+            storage,
             len: self.len,
-            word: 0,
+            word,
             idx: 0,
         }
     }
 
     /// A consuming iterator over all elements in increasing order.
     pub fn into_iter(self) -> IntoIter {
+        let mut storage = self.storage.into_iter();
+        let word = storage.next().unwrap_or(0);
         IntoIter {
-            storage: self.storage.into_iter(),
+            storage,
             len: self.len,
-            word: 0,
+            word,
             idx: 0,
         }
     }

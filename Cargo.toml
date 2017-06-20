@@ -4,6 +4,6 @@ description = "A bitset implementation"
 documentation = "https://docs.rs/id-set/"
 repository = "https://github.com/andrewhickman/id-set"
 license = "MIT"
-version = "0.1.4"
+version = "0.1.5"
 keywords = ["data-structures", "bitset"]
 authors = ["Andrew Hickman <andrew.hickman1@sky.com>"]
