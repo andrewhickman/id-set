@@ -40,8 +40,8 @@ impl IdSet {
         }
     }
 
-    /// Creates a `IdSet` filled with all elements from 0 to n.
     #[inline]
+    /// Creates a `IdSet` filled with all elements from 0 to n.
     pub fn new_filled(n: usize) -> Self {
         let (nwords, nbits) = (n / BITS, n % BITS);
         let mut storage = vec![!0; nwords];
@@ -54,8 +54,8 @@ impl IdSet {
         }
     }
 
-    /// Creates a empty `IdSet` that can hold elements up to n before reallocating.
     #[inline]
+    /// Creates a empty `IdSet` that can hold elements up to n before reallocating.
     pub fn with_capacity(n: usize) -> Self {
         IdSet {
             storage: Vec::with_capacity(ceil_div(n, BITS)),
@@ -63,27 +63,28 @@ impl IdSet {
         }
     }
 
-    /// Creates a set from a raw set of bytes.
     #[inline]
+    /// Creates a set from a raw set of bytes.
     pub fn from_bytes(bytes: &[u32]) -> Self {
         let storage = Vec::from(bytes);
         let len = bytes.iter().map(|&word| word.count_ones() as usize).sum();
         IdSet { storage, len }
     }
     
-    /// Returns the number of elements in the set.
     #[inline]
+    /// Returns the number of elements in the set.
     pub fn len(&self) -> usize {
         self.len
     }
 
-    /// Removes all elements from the set.
     #[inline]
+    /// Removes all elements from the set.
     pub fn clear(&mut self) {
         self.storage.clear();
         self.len = 0;
     }
 
+    #[inline]
     /// Inserts the given elements into the set, returning true if it was not already in the set.
     pub fn insert(&mut self, id: Id) -> bool {
         let (word, bit) = (id / BITS, id % BITS);
@@ -105,6 +106,7 @@ impl IdSet {
         }
     }
 
+    #[inline]
     /// Removes the given element from the set, returning true if it was in the set.
     pub fn remove(&mut self, id: Id) -> bool {
         let (word, bit) = (id / BITS, id % BITS);
@@ -123,6 +125,7 @@ impl IdSet {
         }
     }
 
+    #[inline]
     /// Returns true if the given element is in the set.
     pub fn contains(&self, id: Id) -> bool {
         let (word, bit) = (id / BITS, id % BITS);
@@ -135,6 +138,7 @@ impl IdSet {
         }
     }
 
+    #[inline]
     /// Remove all elements that don't satisfy the predicate.
     pub fn retain<F: FnMut(Id) -> bool>(&mut self, mut pred: F) {
         let mut id = 0;
@@ -150,8 +154,8 @@ impl IdSet {
         }
     }
 
-    /// An iterator over all elements in increasing order.
     #[inline]
+    /// An iterator over all elements in increasing order.
     pub fn iter(&self) -> Iter {
         let mut storage = self.storage.iter();
         let &word = storage.next().unwrap_or(&0);
@@ -163,8 +167,8 @@ impl IdSet {
         }
     }
 
-    /// A consuming iterator over all elements in increasing order.
     #[inline]
+    /// A consuming iterator over all elements in increasing order.
     pub fn into_iter(self) -> IntoIter {
         let mut storage = self.storage.into_iter();
         let word = storage.next().unwrap_or(0);
