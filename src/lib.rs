@@ -302,7 +302,7 @@ impl Iterator for IntoIter {
     fn next(&mut self) -> Option<Self::Item> {
         while self.word == 0 {
             match self.storage.next() {
-                Some(&word) => self.word = word,
+                Some(word) => self.word = word,
                 None => return None,
             }
             self.idx += BITS;
