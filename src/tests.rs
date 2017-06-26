@@ -124,3 +124,91 @@ fn retain() {
 
     assert_eq!(a, b);
 }
+
+#[test]
+fn intersection() {
+    let mut a = IdSet::new();
+    let mut b = IdSet::new();
+
+    assert!(a.insert(11));
+    assert!(a.insert(1));
+    assert!(a.insert(3));
+    assert!(a.insert(77));
+    assert!(a.insert(103));
+    assert!(a.insert(5));
+
+    assert!(b.insert(2));
+    assert!(b.insert(11));
+    assert!(b.insert(77));
+    assert!(b.insert(5));
+    assert!(b.insert(3));
+
+    let expected = [3, 5, 11, 77];
+    let actual: Vec<_> = a.intersection(&b).collect();
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn difference() {
+    let mut a = IdSet::new();
+    let mut b = IdSet::new();
+
+    assert!(a.insert(1));
+    assert!(a.insert(3));
+    assert!(a.insert(5));
+    assert!(a.insert(200));
+    assert!(a.insert(500));
+
+    assert!(b.insert(3));
+    assert!(b.insert(200));
+
+    let expected = [1, 5, 500];
+    let actual: Vec<_> = a.difference(&b).collect();
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn symmetric_difference() {
+    let mut a = IdSet::new();
+    let mut b = IdSet::new();
+
+    assert!(a.insert(1));
+    assert!(a.insert(3));
+    assert!(a.insert(5));
+    assert!(a.insert(9));
+    assert!(a.insert(11));
+
+    assert!(b.insert(3));
+    assert!(b.insert(9));
+    assert!(b.insert(14));
+    assert!(b.insert(220));
+
+    let expected = [1, 5, 11, 14, 220];
+    let actual: Vec<_> = a.symmetric_difference(&b).collect();
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn union() {
+    let mut a = IdSet::new();
+    let mut b = IdSet::new();
+    assert!(a.insert(1));
+    assert!(a.insert(3));
+    assert!(a.insert(5));
+    assert!(a.insert(9));
+    assert!(a.insert(11));
+    assert!(a.insert(160));
+    assert!(a.insert(19));
+    assert!(a.insert(24));
+    assert!(a.insert(200));
+
+    assert!(b.insert(1));
+    assert!(b.insert(5));
+    assert!(b.insert(9));
+    assert!(b.insert(13));
+    assert!(b.insert(19));
+
+    let expected = [1, 3, 5, 9, 11, 13, 19, 24, 160, 200];
+    let actual: Vec<_> = a.union(&b).collect();
+    assert_eq!(actual, expected);
+}
