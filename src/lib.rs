@@ -190,19 +190,37 @@ impl IdSet {
 
     #[inline]
     /// Iterator over the union of two sets.
-    /// Equivalent to self.blocks().union(other.blocks()).into_id_iter().
+    /// Equivalent to `self.blocks().union(other.blocks()).into_id_iter()`.
     pub fn union<'a>(&'a self, other: &'a Self) -> IdIter<Union<Blocks<'a>, Blocks<'a>>> {
         self.blocks().union(other.blocks()).into_id_iter()
     }
 
     #[inline]
     /// Iterator over the intersection of two sets.
-    /// Equivalent to self.blocks().intersection(other.blocks()).into_id_iter().
+    /// Equivalent to `self.blocks().intersection(other.blocks()).into_id_iter()`.
     pub fn intersection<'a>(&'a self,
                             other: &'a Self)
                             -> IdIter<Intersection<Blocks<'a>, Blocks<'a>>> {
         self.blocks()
             .intersection(other.blocks())
+            .into_id_iter()
+    }
+
+    #[inline]
+    /// Iterator over the difference of two sets.
+    /// Equivalent to `self.blocks().difference(other.blocks()).into_id_iter()`.
+    pub fn difference<'a>(&'a self, other: &'a Self) -> IdIter<Difference<Blocks<'a>, Blocks<'a>>> {
+        self.blocks().difference(other.blocks()).into_id_iter()
+    }
+
+    #[inline]
+    /// Iterator over the symmetric difference of two sets.
+    /// Equivalent to `self.blocks().symmetric_difference(other.blocks()).into_id_iter()`.
+    pub fn symmetric_difference<'a>(&'a self,
+                                    other: &'a Self)
+                                    -> IdIter<SymmetricDifference<Blocks<'a>, Blocks<'a>>> {
+        self.blocks()
+            .symmetric_difference(other.blocks())
             .into_id_iter()
     }
 
@@ -431,6 +449,22 @@ pub trait BlockIterator: Iterator<Item = Block> + Sized {
         }
     }
 
+    /// Take the difference of two iterators.
+    fn difference<B: BlockIterator>(self, other: B) -> Difference<Self, B> {
+        Difference {
+            left: self,
+            right: other,
+        }
+    }
+
+    /// Take the symmetric difference of two iterators.
+    fn symmetric_difference<B: BlockIterator>(self, other: B) -> SymmetricDifference<Self, B> {
+        SymmetricDifference {
+            left: self,
+            right: other,
+        }
+    }
+
     /// Take the complement of the iterator.
     fn complement(self) -> Complement<Self> {
         Complement { blocks: self }
@@ -565,6 +599,81 @@ impl<L, R> Iterator for Intersection<L, R>
 }
 
 impl<L, R> ExactSizeIterator for Intersection<L, R>
+    where L: ExactSizeIterator<Item = Block>,
+          R: ExactSizeIterator<Item = Block>
+{
+    fn len(&self) -> usize {
+        cmp::max(self.left.len(), self.right.len())
+    }
+}
+
+/// Takes the difference of two block iterators.
+pub struct Difference<L, R> {
+    left: L,
+    right: R,
+}
+
+impl<L, R> Iterator for Difference<L, R>
+    where L: BlockIterator,
+          R: BlockIterator
+{
+    type Item = Block;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.left
+            .next()
+            .map(|l| l & !self.right.next().unwrap_or(0))
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.left.size_hint()
+    }
+}
+
+impl<L, R> ExactSizeIterator for Difference<L, R>
+    where L: ExactSizeIterator<Item = Block>,
+          R: ExactSizeIterator<Item = Block>
+{
+    fn len(&self) -> usize {
+        self.left.len()
+    }
+}
+
+/// Takes the symmetric difference of two block iterators.
+pub struct SymmetricDifference<L, R> {
+    left: L,
+    right: R,
+}
+
+impl<L, R> Iterator for SymmetricDifference<L, R>
+    where L: BlockIterator,
+          R: BlockIterator
+{
+    type Item = Block;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match (self.left.next(), self.right.next()) {
+            (Some(l), Some(r)) => Some(l ^ r),
+            (Some(l), None) => Some(l),
+            (None, Some(r)) => Some(r),
+            (None, None) => None,
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let (llo, lhi) = self.left.size_hint();
+        let (rlo, rhi) = self.right.size_hint();
+        let lo = cmp::max(llo, rlo);
+        let hi = if let (Some(lhi), Some(rhi)) = (lhi, rhi) {
+            Some(cmp::max(lhi, rhi))
+        } else {
+            None
+        };
+        (lo, hi)
+    }
+}
+
+impl<L, R> ExactSizeIterator for SymmetricDifference<L, R>
     where L: ExactSizeIterator<Item = Block>,
           R: ExactSizeIterator<Item = Block>
 {
