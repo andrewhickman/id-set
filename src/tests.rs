@@ -29,7 +29,7 @@ fn remove() {
     assert!(a.remove(1000));
 
     assert_eq!(a.len(), 0);
-} 
+}
 
 #[test]
 fn iterator() {
@@ -39,14 +39,19 @@ fn iterator() {
     assert_eq!(ids, [0, 2, 3]);
 
     let long: IdSet = (0..10000).filter(|&n| n % 2 == 0).collect();
-    let real: Vec<_> = (0..10000/2).map(|x| x*2).collect();
+    let real: Vec<_> = (0..10000 / 2).map(|x| x * 2).collect();
 
     let ids: Vec<_> = long.iter().collect();
     assert_eq!(ids, real);
 
     let mut x = 0;
-    let long: IdSet = (1..1000).map(|n| { x += 2*n - 1; x }).collect();
-    let real: Vec<_> = (1..1000).map(|n| n*n).collect();
+    let long: IdSet = (1..1000)
+        .map(|n| {
+                 x += 2 * n - 1;
+                 x
+             })
+        .collect();
+    let real: Vec<_> = (1..1000).map(|n| n * n).collect();
 
     let ids: Vec<_> = long.into_iter().collect();
     assert_eq!(ids, real);
@@ -99,7 +104,7 @@ fn eq() {
 #[test]
 fn from_bytes() {
     let a = IdSet::from_bytes(&[0b01101001]);
-    
+
     assert!(a.contains(0));
     assert!(!a.contains(1));
     assert!(!a.contains(2));
