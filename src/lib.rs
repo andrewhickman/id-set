@@ -1,7 +1,7 @@
 //! A bit-set implementation for use in id-map. Notable differences from bit-set are the IntoIter
 //! struct and retain() methods.
 
-#![deny(missing_docs)]
+#![deny(missing_docs, missing_debug_implementations)]
 
 #[cfg(test)]
 mod tests;
@@ -521,6 +521,7 @@ impl ExactSizeIterator for IntoBlocks {
     }
 }
 
+#[derive(Clone, Debug)]
 /// Takes the union of two block iterators.
 pub struct Union<L, R> {
     left: L,
@@ -564,6 +565,7 @@ impl<L, R> ExactSizeIterator for Union<L, R>
     }
 }
 
+#[derive(Clone, Debug)]
 /// Takes the intersection of two block iterators.
 pub struct Intersection<L, R> {
     left: L,
@@ -607,6 +609,7 @@ impl<L, R> ExactSizeIterator for Intersection<L, R>
     }
 }
 
+#[derive(Clone, Debug)]
 /// Takes the difference of two block iterators.
 pub struct Difference<L, R> {
     left: L,
@@ -639,6 +642,7 @@ impl<L, R> ExactSizeIterator for Difference<L, R>
     }
 }
 
+#[derive(Clone, Debug)]
 /// Takes the symmetric difference of two block iterators.
 pub struct SymmetricDifference<L, R> {
     left: L,
@@ -682,6 +686,7 @@ impl<L, R> ExactSizeIterator for SymmetricDifference<L, R>
     }
 }
 
+#[derive(Clone, Debug)]
 /// Takes the complement of a block iterator. This iterator will never return None.
 pub struct Complement<B> {
     blocks: B,
