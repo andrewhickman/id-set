@@ -6,7 +6,7 @@
 #[cfg(test)]
 mod tests;
 
-use std::{fmt, slice, vec};
+use std::{cmp, fmt, slice, vec};
 use std::iter::FromIterator;
 
 /// The element type of the set.
@@ -179,17 +179,37 @@ impl IdSet {
     #[inline]
     /// An iterator over the blocks of the underlying representation.
     pub fn blocks(&self) -> Blocks {
-        Blocks {
-            inner: self.blocks.iter(),
-        }
+        Blocks { inner: self.blocks.iter() }
     }
 
     #[inline]
     /// A consuming iterator over the blocks of the underlying representation.
     pub fn into_blocks(self) -> IntoBlocks {
-        IntoBlocks {
-            inner: self.blocks.into_iter(),
-        }
+        IntoBlocks { inner: self.blocks.into_iter() }
+    }
+
+    #[inline]
+    /// Iterator over the union of two sets.
+    /// Equivalent to self.blocks().union(other.blocks()).into_id_iter().
+    pub fn union<'a>(&'a self, other: &'a Self) -> IdIter<Union<Blocks<'a>, Blocks<'a>>> {
+        self.blocks().union(other.blocks()).into_id_iter()
+    }
+
+    #[inline]
+    /// Iterator over the intersection of two sets.
+    /// Equivalent to self.blocks().intersection(other.blocks()).into_id_iter().
+    pub fn intersection<'a>(&'a self,
+                            other: &'a Self)
+                            -> IdIter<Intersection<Blocks<'a>, Blocks<'a>>> {
+        self.blocks()
+            .intersection(other.blocks())
+            .into_id_iter()
+    }
+
+    #[inline]
+    /// Iterator over the complement of the set. This iterator will never return None.
+    pub fn complement(&self) -> IdIter<Complement<Blocks>> {
+        self.blocks().complement().into_id_iter()
     }
 }
 
@@ -350,13 +370,15 @@ impl ExactSizeIterator for IntoIter {
 
 #[derive(Clone, Debug)]
 /// Transforms an iterator over blocks into an iterator over elements.
-pub struct IdIter<I> {
-    blocks: I,
+pub struct IdIter<B> {
+    blocks: B,
     word: Block,
     idx: usize,
 }
 
-impl<I> Iterator for IdIter<I> where I: ExactSizeIterator<Item = Block> {
+impl<B> Iterator for IdIter<B>
+    where B: BlockIterator
+{
     type Item = Id;
 
     #[inline]
@@ -377,12 +399,12 @@ impl<I> Iterator for IdIter<I> where I: ExactSizeIterator<Item = Block> {
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         let ones = self.word.count_ones() as usize;
-        (ones, Some(self.blocks.len() * BITS + ones))
+        (ones, self.blocks.size_hint().1.map(|hi| hi * BITS + ones))
     }
 }
 
 /// An iterator over blocks of elements.
-pub trait BlockIterator: ExactSizeIterator<Item = Block> + Sized {
+pub trait BlockIterator: Iterator<Item = Block> + Sized {
     /// Creates an iterator over elements in the blocks.
     fn into_id_iter(mut self) -> IdIter<Self> {
         let word = self.next().unwrap_or(0);
@@ -392,9 +414,30 @@ pub trait BlockIterator: ExactSizeIterator<Item = Block> + Sized {
             idx: 0,
         }
     }
+
+    /// Take the union of two iterators.
+    fn union<B: BlockIterator>(self, other: B) -> Union<Self, B> {
+        Union {
+            left: self,
+            right: other,
+        }
+    }
+
+    /// Take the intersection of two iterators.
+    fn intersection<B: BlockIterator>(self, other: B) -> Intersection<Self, B> {
+        Intersection {
+            left: self,
+            right: other,
+        }
+    }
+
+    /// Take the complement of the iterator.
+    fn complement(self) -> Complement<Self> {
+        Complement { blocks: self }
+    }
 }
 
-impl<I> BlockIterator for I where I: ExactSizeIterator<Item = Block> {}
+impl<I> BlockIterator for I where I: Iterator<Item = Block> {}
 
 #[derive(Clone, Debug)]
 /// An iterator over the blocks of the underlying representation.
@@ -441,5 +484,110 @@ impl Iterator for IntoBlocks {
 impl ExactSizeIterator for IntoBlocks {
     fn len(&self) -> usize {
         self.inner.len()
+    }
+}
+
+/// Takes the union of two block iterators.
+pub struct Union<L, R> {
+    left: L,
+    right: R,
+}
+
+impl<L, R> Iterator for Union<L, R>
+    where L: BlockIterator,
+          R: BlockIterator
+{
+    type Item = Block;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match (self.left.next(), self.right.next()) {
+            (Some(l), Some(r)) => Some(l | r),
+            (Some(l), None) => Some(l),
+            (None, Some(r)) => Some(r),
+            (None, None) => None,
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let (llo, lhi) = self.left.size_hint();
+        let (rlo, rhi) = self.right.size_hint();
+        let lo = cmp::max(llo, rlo);
+        let hi = if let (Some(lhi), Some(rhi)) = (lhi, rhi) {
+            Some(cmp::max(lhi, rhi))
+        } else {
+            None
+        };
+        (lo, hi)
+    }
+}
+
+impl<L, R> ExactSizeIterator for Union<L, R>
+    where L: BlockIterator + ExactSizeIterator,
+          R: BlockIterator + ExactSizeIterator
+{
+    fn len(&self) -> usize {
+        cmp::max(self.left.len(), self.right.len())
+    }
+}
+
+/// Takes the intersection of two block iterators.
+pub struct Intersection<L, R> {
+    left: L,
+    right: R,
+}
+
+impl<L, R> Iterator for Intersection<L, R>
+    where L: BlockIterator,
+          R: BlockIterator
+{
+    type Item = Block;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let (Some(l), Some(r)) = (self.left.next(), self.right.next()) {
+            Some(l & r)
+        } else {
+            None
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let (llo, lhi) = self.left.size_hint();
+        let (rlo, rhi) = self.right.size_hint();
+        let lo = cmp::max(llo, rlo);
+        let hi = match (lhi, rhi) {
+            (Some(lhi), Some(rhi)) => Some(cmp::min(lhi, rhi)),
+            (Some(lhi), None) => Some(lhi),
+            (None, Some(rhi)) => Some(rhi),
+            (None, None) => None,
+        };
+        (lo, hi)
+    }
+}
+
+impl<L, R> ExactSizeIterator for Intersection<L, R>
+    where L: ExactSizeIterator<Item = Block>,
+          R: ExactSizeIterator<Item = Block>
+{
+    fn len(&self) -> usize {
+        cmp::max(self.left.len(), self.right.len())
+    }
+}
+
+/// Takes the complement of a block iterator. This iterator will never return None.
+pub struct Complement<B> {
+    blocks: B,
+}
+
+impl<B> Iterator for Complement<B>
+    where B: BlockIterator
+{
+    type Item = Block;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        Some(!self.blocks.next().unwrap_or(0))
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, None)
     }
 }
