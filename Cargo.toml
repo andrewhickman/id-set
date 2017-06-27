@@ -4,6 +4,6 @@ description = "A bitset implementation that tracks its size. The API is mostly s
 documentation = "https://docs.rs/id-set/"
 repository = "https://github.com/andrewhickman/id-set"
 license = "MIT"
-version = "0.1.8"
+version = "0.1.9"
 keywords = ["data-structures", "bitset"]
 authors = ["Andrew Hickman <andrew.hickman1@sky.com>"]
