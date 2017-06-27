@@ -1,6 +1,6 @@
 [package]
 name = "id-set"
-description = "A bitset implementation"
+description = "A bitset implementation that tracks its size. The API is mostly similar to bit-set but also includes `retain()` and `into_iter()`, as well as the ability to take unions, intersections etc of more than 2 sets."
 documentation = "https://docs.rs/id-set/"
 repository = "https://github.com/andrewhickman/id-set"
 license = "MIT"

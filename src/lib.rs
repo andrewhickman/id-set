@@ -6,7 +6,7 @@
 #[cfg(test)]
 mod tests;
 
-use std::{cmp, fmt, slice, vec};
+use std::{cmp, fmt, slice, usize, vec};
 use std::iter::FromIterator;
 
 /// The element type of the set.
@@ -64,9 +64,8 @@ impl IdSet {
         }
     }
 
-    #[inline]
-    /// Creates a set from a raw set of bytes.
-    pub fn from_bytes(bytes: &[Block]) -> Self {
+    #[cfg(test)]
+    fn from_bytes(bytes: &[Block]) -> Self {
         let blocks = Vec::from(bytes);
         let len = bytes
             .iter()
@@ -76,9 +75,43 @@ impl IdSet {
     }
 
     #[inline]
-    /// Returns the number of elements in the set.
+    /// Returns the number of distinct elements in the set.
     pub fn len(&self) -> usize {
         self.len
+    }
+
+    #[inline]
+    /// Returns true if the set is empty.
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    #[inline]
+    /// Returns capacity of the set. Inserting any elements less than this will not cause
+    /// reallocation.
+    pub fn capacity(&self) -> usize {
+        self.blocks
+            .capacity()
+            .checked_mul(BITS)
+            .unwrap_or(usize::MAX)
+    }
+
+    #[inline]
+    /// Resizes the set such that `capacity() >= cap`.
+    pub fn reserve(&mut self, cap: usize) {
+        self.blocks.reserve(ceil_div(cap, BITS));
+    }
+
+    #[inline]
+    /// Resizes the set such that `capacity()` is minimal.
+    pub fn shrink_to_fit(&mut self) {
+        while let Some(&block) = self.blocks.last() {
+            if block == 0 {
+                break;
+            }
+            self.blocks.pop();
+        }
+        self.blocks.shrink_to_fit();
     }
 
     #[inline]
@@ -158,6 +191,12 @@ impl IdSet {
     }
 
     #[inline]
+    /// Returns a slice of the underlying blocks.
+    pub fn as_blocks(&self) -> &[Block] {
+        &self.blocks
+    }
+
+    #[inline]
     /// An iterator over all elements in increasing order.
     pub fn iter(&self) -> Iter {
         Iter {
@@ -229,6 +268,82 @@ impl IdSet {
     pub fn complement(&self) -> IdIter<Complement<Blocks>> {
         self.blocks().complement().into_id_iter()
     }
+
+    #[inline]
+    /// Take the union of the set with another set.
+    pub fn union_with(&mut self, other: &Self) {
+        let mut blocks = other.blocks();
+        for lblock in self.blocks.iter_mut() {
+            if let Some(rblock) = blocks.next() {
+                self.len += (rblock & !*lblock).count_ones() as usize;
+                *lblock |= rblock;
+            } else {
+                return;
+            }
+        }
+        let len = &mut self.len;
+        self.blocks.extend(blocks.inspect(|block| *len += block.count_ones() as usize));
+    }
+
+    #[inline]
+    /// Take the intersection of the set with another set.
+    pub fn intersect_with(&mut self, other: &Self) {
+        let blocks = other.blocks();
+        if blocks.len() < self.blocks.len() {
+            for block in self.blocks.drain(blocks.len()..) {
+                self.len -= block.count_ones() as usize;
+            }
+        }
+        for (lblock, rblock) in self.blocks.iter_mut().zip(blocks) {
+            self.len -= (*lblock & !rblock).count_ones() as usize;
+            *lblock &= rblock;
+        }
+    }
+
+    #[inline]
+    /// Take the difference of the set with another set.
+    pub fn difference_with(&mut self, other: &Self) {
+        for (lblock, rblock) in self.blocks.iter_mut().zip(other.blocks()) {
+            self.len -= (*lblock & rblock).count_ones() as usize;
+            *lblock &= !rblock;
+        }
+    }
+
+    #[inline]
+    /// Take the symmetric difference of the set with another set.
+    pub fn symmetric_difference_with(&mut self, other: &Self) {
+        let mut blocks = other.blocks();
+        for lblock in self.blocks.iter_mut() {
+            if let Some(rblock) = blocks.next() {
+                self.len -= lblock.count_ones() as usize;
+                *lblock ^= rblock;
+                self.len += lblock.count_ones() as usize;
+            } else {
+                return;
+            }
+        }
+        let len = &mut self.len;
+        self.blocks.extend(blocks.inspect(|block| *len += block.count_ones() as usize));
+    }
+
+    #[inline]
+    /// Returns true if the sets are disjoint.
+    pub fn is_disjoint(&self, other: &Self) -> bool {
+        self.len() + other.len() < cmp::max(self.capacity(), other.capacity()) &&
+        self.intersection(other).count() == 0
+    }
+
+    #[inline]
+    /// Returns true if self is a superset of other.
+    pub fn is_superset(&self, other: &Self) -> bool {
+        !other.is_subset(self)
+    }
+
+    #[inline]
+    /// Returns true if self is a subset of other.
+    pub fn is_subset(&self, other: &Self) -> bool {
+        self.len() <= other.len() && self.difference(other).count() == 0
+    }
 }
 
 impl Clone for IdSet {
@@ -275,17 +390,17 @@ impl PartialEq for IdSet {
         if self.len != other.len {
             return false;
         }
-        let (mut lhs, mut rhs) = (self.blocks.iter(), other.blocks.iter());
+        let (mut lhs, mut rhs) = (self.blocks(), other.blocks());
         loop {
             match (lhs.next(), rhs.next()) {
-                (Some(&l), Some(&r)) => {
+                (Some(l), Some(r)) => {
                     if l != r {
                         return false;
                     }
                 }
                 (None, None) => return true,
-                (Some(&l), None) => return l == 0 && lhs.all(|&word| word == 0),
-                (None, Some(&r)) => return r == 0 && rhs.all(|&word| word == 0),
+                (Some(l), None) => return l == 0 && lhs.all(|block| block == 0),
+                (None, Some(r)) => return r == 0 && rhs.all(|block| block == 0),
             }
         }
     }

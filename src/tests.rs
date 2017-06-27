@@ -212,3 +212,155 @@ fn union() {
     let actual: Vec<_> = a.union(&b).collect();
     assert_eq!(actual, expected);
 }
+
+#[test]
+fn subset() {
+    let mut set1 = IdSet::new();
+    let mut set2 = IdSet::new();
+
+    assert!(set1.is_subset(&set2)); //  {}  {}
+    set2.insert(100);
+    assert!(set1.is_subset(&set2)); //  {}  { 1 }
+    set2.insert(200);
+    assert!(set1.is_subset(&set2)); //  {}  { 1, 2 }
+    set1.insert(200);
+    assert!(set1.is_subset(&set2)); //  { 2 }  { 1, 2 }
+    set1.insert(300);
+    assert!(!set1.is_subset(&set2)); // { 2, 3 }  { 1, 2 }
+    set2.insert(300);
+    assert!(set1.is_subset(&set2)); // { 2, 3 }  { 1, 2, 3 }
+    set2.insert(400);
+    assert!(set1.is_subset(&set2)); // { 2, 3 }  { 1, 2, 3, 4 }
+    set2.remove(100);
+    assert!(set1.is_subset(&set2)); // { 2, 3 }  { 2, 3, 4 }
+    set2.remove(300);
+    assert!(!set1.is_subset(&set2)); // { 2, 3 }  { 2, 4 }
+    set1.remove(300);
+    assert!(set1.is_subset(&set2)); // { 2 }  { 2, 4 }
+}
+
+#[test]
+fn is_disjoint() {
+    let a = IdSet::from_bytes(&[0b10100010]);
+    let b = IdSet::from_bytes(&[0b01000000]);
+    let c = IdSet::new();
+    let d = IdSet::from_bytes(&[0b00110000]);
+
+    assert!(!a.is_disjoint(&d));
+    assert!(!d.is_disjoint(&a));
+
+    assert!(a.is_disjoint(&b));
+    assert!(a.is_disjoint(&c));
+    assert!(b.is_disjoint(&a));
+    assert!(b.is_disjoint(&c));
+    assert!(c.is_disjoint(&a));
+    assert!(c.is_disjoint(&b));
+}
+
+#[test]
+fn union_with() {
+    //a should grow to include larger elements
+    let mut a = IdSet::new();
+    a.insert(0);
+    let mut b = IdSet::new();
+    b.insert(5);
+    let expected = IdSet::from_bytes(&[0b00100001]);
+    a.union_with(&b);
+    assert_eq!(a, expected);
+
+    // Standard
+    let mut a = IdSet::from_bytes(&[0b10100010]);
+    let mut b = IdSet::from_bytes(&[0b01100010]);
+    let c = a.clone();
+    a.union_with(&b);
+    b.union_with(&c);
+    assert_eq!(a.len(), 4);
+    assert_eq!(b.len(), 4);
+}
+
+#[test]
+fn intersect_with() {
+    // Explicitly 0'ed bits
+    let mut a = IdSet::from_bytes(&[0b10100010]);
+    let mut b = IdSet::from_bytes(&[0b00000000]);
+    let c = a.clone();
+    a.intersect_with(&b);
+    b.intersect_with(&c);
+    assert!(a.is_empty());
+    assert!(b.is_empty());
+
+    // Uninitialized bits should behave like 0's
+    let mut a = IdSet::from_bytes(&[0b10100010]);
+    let mut b = IdSet::new();
+    let c = a.clone();
+    a.intersect_with(&b);
+    b.intersect_with(&c);
+    assert!(a.is_empty());
+    assert!(b.is_empty());
+
+    // Standard
+    let mut a = IdSet::from_bytes(&[0b10100010]);
+    let mut b = IdSet::from_bytes(&[0b01100010]);
+    let c = a.clone();
+    a.intersect_with(&b);
+    b.intersect_with(&c);
+    assert_eq!(a.len(), 2);
+    assert_eq!(b.len(), 2);
+}
+
+#[test]
+fn difference_with() {
+    // Explicitly 0'ed bits
+    let mut a = IdSet::from_bytes(&[0b00000000]);
+    let b = IdSet::from_bytes(&[0b10100010]);
+    a.difference_with(&b);
+    assert!(a.is_empty());
+
+    // Uninitialized bits should behave like 0's
+    let mut a = IdSet::new();
+    let b = IdSet::from_bytes(&[0b11111111]);
+    a.difference_with(&b);
+    assert!(a.is_empty());
+
+    // Standard
+    let mut a = IdSet::from_bytes(&[0b10100010]);
+    println!("{:?}", a);
+    let mut b = IdSet::from_bytes(&[0b01100010]);
+    println!("{:?}", b);
+    let c = a.clone();
+    a.difference_with(&b);
+    println!("{:?}", a);
+    b.difference_with(&c);
+    println!("{:?}", b);
+    assert_eq!(a.len(), 1);
+    assert_eq!(b.len(), 1);
+}
+
+#[test]
+fn symmetric_difference_with() {
+    //a should grow to include larger elements
+    let mut a = IdSet::new();
+    a.insert(0);
+    a.insert(1);
+    let mut b = IdSet::new();
+    b.insert(1);
+    b.insert(5);
+    let expected = IdSet::from_bytes(&[0b00100001]);
+    a.symmetric_difference_with(&b);
+    assert_eq!(a, expected);
+
+    let mut a = IdSet::from_bytes(&[0b10100010]);
+    let b = IdSet::new();
+    let c = a.clone();
+    a.symmetric_difference_with(&b);
+    assert_eq!(a, c);
+
+    // Standard
+    let mut a = IdSet::from_bytes(&[0b11100010]);
+    let mut b = IdSet::from_bytes(&[0b01101010]);
+    let c = a.clone();
+    a.symmetric_difference_with(&b);
+    b.symmetric_difference_with(&c);
+    assert_eq!(a.len(), 2);
+    assert_eq!(b.len(), 2);
+}
