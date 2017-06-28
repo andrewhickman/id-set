@@ -468,6 +468,16 @@ impl<'a> ExactSizeIterator for Iter<'a> {
     }
 }
 
+impl IntoIterator for IdSet {
+    type Item = Id;
+    type IntoIter = IntoIter;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.into_iter()
+    }
+}
+
 #[derive(Clone, Debug)]
 /// A consuming iterator over all elements in increasing order.
 pub struct IntoIter {
