@@ -1,4 +1,4 @@
-//! A bit-set implementation for use in id-map. Notable differences from bit-set are the IntoIter
+//! A bit-set implementation for use in id-map. Notable differences from bit-set are the `IntoIter`
 //! struct and retain() methods.
 
 #![deny(missing_docs, missing_debug_implementations)]
@@ -8,10 +8,12 @@ mod tests;
 
 mod store;
 
+pub use store::{Iter as Blocks, IntoIter as IntoBlocks};
+
 use std::{cmp, fmt, iter, usize};
 use std::iter::FromIterator;
 
-use self::store::BlockStore;
+use store::BlockStore;
 
 /// The element type of the set.
 pub type Id = usize;
@@ -31,7 +33,7 @@ fn ceil_div(n: usize, k: usize) -> usize {
     if n % k == 0 { n / k } else { n / k + 1 }
 }
 
-/// A set of `usize` elements represented by a bit vector. blocks required is proportional to the
+/// A set of `usize` elements represented by a bit vector. Storage required is proportional to the
 /// maximum element in the set.
 pub struct IdSet {
     blocks: BlockStore,
@@ -208,31 +210,21 @@ impl IdSet {
     }
 
     #[inline]
-    /// A consuming iterator over all elements in increasing order.
-    pub fn into_iter(self) -> IntoIter {
-        let len = self.len;
-        IntoIter {
-            inner: self.into_blocks().into_id_iter(),
-            len,
-        }
-    }
-
-    #[inline]
     /// An iterator over the blocks of the underlying representation.
-    pub fn blocks(&self) -> store::Iter {
+    pub fn blocks(&self) -> Blocks {
         self.blocks.iter()
     }
 
     #[inline]
     /// A consuming iterator over the blocks of the underlying representation.
-    pub fn into_blocks(self) -> store::IntoIter {
+    pub fn into_blocks(self) -> IntoBlocks {
         self.blocks.into_iter()
     }
 
     #[inline]
     /// Iterator over the union of two sets.
     /// Equivalent to `self.blocks().union(other.blocks()).into_id_iter()`.
-    pub fn union<'a>(&'a self, other: &'a Self) -> IdIter<Union<store::Iter<'a>, store::Iter<'a>>> {
+    pub fn union<'a>(&'a self, other: &'a Self) -> IdIter<Union<Blocks<'a>, Blocks<'a>>> {
         self.blocks().union(other.blocks()).into_id_iter()
     }
 
@@ -241,7 +233,7 @@ impl IdSet {
     /// Equivalent to `self.blocks().intersection(other.blocks()).into_id_iter()`.
     pub fn intersection<'a>(&'a self,
                             other: &'a Self)
-                            -> IdIter<Intersection<store::Iter<'a>, store::Iter<'a>>> {
+                            -> IdIter<Intersection<Blocks<'a>, Blocks<'a>>> {
         self.blocks()
             .intersection(other.blocks())
             .into_id_iter()
@@ -250,19 +242,16 @@ impl IdSet {
     #[inline]
     /// Iterator over the difference of two sets.
     /// Equivalent to `self.blocks().difference(other.blocks()).into_id_iter()`.
-    pub fn difference<'a>(&'a self,
-                          other: &'a Self)
-                          -> IdIter<Difference<store::Iter<'a>, store::Iter<'a>>> {
+    pub fn difference<'a>(&'a self, other: &'a Self) -> IdIter<Difference<Blocks<'a>, Blocks<'a>>> {
         self.blocks().difference(other.blocks()).into_id_iter()
     }
 
     #[inline]
     /// Iterator over the symmetric difference of two sets.
     /// Equivalent to `self.blocks().symmetric_difference(other.blocks()).into_id_iter()`.
-    pub fn symmetric_difference<'a>
-        (&'a self,
-         other: &'a Self)
-         -> IdIter<SymmetricDifference<store::Iter<'a>, store::Iter<'a>>> {
+    pub fn symmetric_difference<'a>(&'a self,
+                                    other: &'a Self)
+                                    -> IdIter<SymmetricDifference<Blocks<'a>, Blocks<'a>>> {
         self.blocks()
             .symmetric_difference(other.blocks())
             .into_id_iter()
@@ -270,7 +259,7 @@ impl IdSet {
 
     #[inline]
     /// Iterator over the complement of the set. This iterator will never return None.
-    pub fn complement(&self) -> IdIter<Complement<store::Iter>> {
+    pub fn complement(&self) -> IdIter<Complement<Blocks>> {
         self.blocks().complement().into_id_iter()
     }
 
@@ -446,7 +435,7 @@ impl<'a> IntoIterator for &'a IdSet {
 #[derive(Clone, Debug)]
 /// An iterator over all elements in increasing order.
 pub struct Iter<'a> {
-    inner: IdIter<store::Iter<'a>>,
+    inner: IdIter<Blocks<'a>>,
     len: usize,
 }
 
@@ -481,14 +470,18 @@ impl IntoIterator for IdSet {
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        self.into_iter()
+        let len = self.len;
+        IntoIter {
+            inner: self.into_blocks().into_id_iter(),
+            len,
+        }
     }
 }
 
 #[derive(Clone, Debug)]
 /// A consuming iterator over all elements in increasing order.
 pub struct IntoIter {
-    inner: IdIter<store::IntoIter>,
+    inner: IdIter<IntoBlocks>,
     len: usize,
 }
 

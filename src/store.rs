@@ -25,22 +25,6 @@ impl BlockStore {
         }
     }
 
-    pub fn from_elem(elem: Block, len: usize) -> Self {
-        if len < SIZE {
-            let mut arr = [0; SIZE];
-            for i in 0..len {
-                arr[i] = elem;
-            }
-            Stack(arr)
-        } else {
-            Heap(vec![elem; len])
-        }
-    }
-
-    pub fn len(&self) -> usize {
-        self.map_vec(Vec::len).unwrap_or(SIZE)
-    }
-
     pub fn clear(&mut self) {
         if let Heap(ref mut vec) = *self {
             vec.clear()
@@ -50,7 +34,11 @@ impl BlockStore {
     }
 
     pub fn capacity(&self) -> usize {
-        self.map_vec(Vec::capacity).unwrap_or(SIZE)
+        if let Heap(ref vec) = *self {
+            vec.capacity()
+        } else {
+            SIZE
+        }
     }
 
     pub fn reserve(&mut self, cap: usize) {
@@ -74,12 +62,8 @@ impl BlockStore {
         let arr = match *self {
             Stack(_) => return,
             Heap(ref mut vec) => {
-                while let Some(&block) = vec.last() {
-                    if block == 0 {
-                        vec.pop();
-                    } else {
-                        break;
-                    }
+                while let Some(&0) = vec.last() {
+                    vec.pop();
                 }
                 if vec.len() < SIZE {
                     let mut arr = [0; SIZE];
@@ -94,14 +78,6 @@ impl BlockStore {
             }
         };
         *self = Stack(arr);
-    }
-
-    fn map_vec<T, F: FnOnce(&Vec<Block>) -> T>(&self, f: F) -> Option<T> {
-        if let Heap(ref vec) = *self {
-            Some(f(vec))
-        } else {
-            None
-        }
     }
 
     pub fn drain(&mut self, idx: usize) -> Drain {
@@ -121,8 +97,8 @@ impl BlockStore {
         let vec = match *self {
             Stack(ref mut arr) => {
                 if new_len < SIZE {
-                    for i in new_len..SIZE {
-                        arr[i] = 0;
+                    for block in arr {
+                        *block = 0;
                     }
                     return;
                 } else {
@@ -147,12 +123,11 @@ impl BlockStore {
     pub fn iter_mut(&mut self) -> slice::IterMut<Block> {
         ops::DerefMut::deref_mut(self).iter_mut()
     }
+}
 
-    pub fn into_iter(self) -> IntoIter {
-        match self {
-            Stack(data) => IntoIter::Stack { data, idx: 0 },
-            Heap(vec) => IntoIter::Heap(vec.into_iter()),
-        }
+impl Default for BlockStore {
+    fn default() -> Self {
+        BlockStore::new()
     }
 }
 
@@ -214,10 +189,15 @@ impl iter::FromIterator<Block> for BlockStore {
                     return Stack(arr);
                 }
             }
-            let mut vec = Vec::with_capacity(SIZE + iter.size_hint().0);
-            vec.extend(&arr);
-            vec.extend(iter);
-            Heap(vec)
+            if let Some(block) = iter.next() {
+                let mut vec = Vec::with_capacity(SIZE + 1 + iter.size_hint().0);
+                vec.extend(&arr);
+                vec.push(block);
+                vec.extend(iter);
+                Heap(vec)
+            } else {
+                Stack(arr)
+            }
         } else {
             Heap(Vec::from_iter(iter))
         }
@@ -238,12 +218,47 @@ impl IntoIterator for BlockStore {
     type IntoIter = IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.into_iter()
+        IntoIter {
+            kind: match self {
+                Stack(data) => IntoIterKind::Stack { data, idx: 0 },
+                Heap(vec) => IntoIterKind::Heap(vec.into_iter()),
+            },
+        }
     }
 }
 
 #[derive(Clone, Debug)]
-pub enum IntoIter {
+/// An iterator over the blocks of the underlying representation.
+pub struct Iter<'a> {
+    inner: slice::Iter<'a, Block>,
+}
+
+impl<'a> Iterator for Iter<'a> {
+    type Item = Block;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next().cloned()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.inner.size_hint()
+    }
+}
+
+impl<'a> ExactSizeIterator for Iter<'a> {
+    fn len(&self) -> usize {
+        self.inner.len()
+    }
+}
+
+#[derive(Clone, Debug)]
+/// A consuming iterator over the blocks of the underlying representation.
+pub struct IntoIter {
+    kind: IntoIterKind,
+}
+
+#[derive(Clone, Debug)]
+enum IntoIterKind {
     Stack { data: [Block; SIZE], idx: u8 },
     Heap(vec::IntoIter<Block>),
 }
@@ -252,8 +267,8 @@ impl Iterator for IntoIter {
     type Item = Block;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match *self {
-            IntoIter::Stack {
+        match self.kind {
+            IntoIterKind::Stack {
                 ref data,
                 ref mut idx,
             } => {
@@ -265,19 +280,26 @@ impl Iterator for IntoIter {
                     Some(ret)
                 }
             }
-            IntoIter::Heap(ref mut vec) => vec.next(),
+            IntoIterKind::Heap(ref mut vec) => vec.next(),
         }
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        match *self {
-            IntoIter::Stack { idx, .. } => (SIZE - idx as usize, Some(SIZE - idx as usize)),
-            IntoIter::Heap(ref vec) => vec.size_hint(),
+        match self.kind {
+            IntoIterKind::Stack { idx, .. } => (SIZE - idx as usize, Some(SIZE - idx as usize)),
+            IntoIterKind::Heap(ref vec) => vec.size_hint(),
         }
     }
 }
 
-impl ExactSizeIterator for IntoIter {}
+impl ExactSizeIterator for IntoIter {
+    fn len(&self) -> usize {
+        match self.kind {
+            IntoIterKind::Stack { idx, .. } => SIZE - idx as usize,
+            IntoIterKind::Heap(ref vec) => vec.len(),
+        }
+    }
+}
 
 #[derive(Debug)]
 pub enum Drain<'a> {
@@ -318,29 +340,12 @@ impl<'a> Iterator for Drain<'a> {
     }
 }
 
-impl<'a> ExactSizeIterator for Drain<'a> {}
-
-#[derive(Clone, Debug)]
-/// An iterator over the blocks of the underlying representation.
-pub struct Iter<'a> {
-    inner: slice::Iter<'a, Block>,
-}
-
-impl<'a> Iterator for Iter<'a> {
-    type Item = Block;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next().map(|&block| block)
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.inner.size_hint()
-    }
-}
-
-impl<'a> ExactSizeIterator for Iter<'a> {
+impl<'a> ExactSizeIterator for Drain<'a> {
     fn len(&self) -> usize {
-        self.inner.len()
+        match *self {
+            Drain::Stack { idx, .. } => SIZE - idx as usize,
+            Drain::Heap(ref vec) => vec.len(),
+        }
     }
 }
 
