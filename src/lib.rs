@@ -6,8 +6,12 @@
 #[cfg(test)]
 mod tests;
 
-use std::{cmp, fmt, slice, usize, vec};
+mod store;
+
+use std::{cmp, fmt, iter, usize};
 use std::iter::FromIterator;
+
+use self::store::BlockStore;
 
 /// The element type of the set.
 pub type Id = usize;
@@ -30,7 +34,7 @@ fn ceil_div(n: usize, k: usize) -> usize {
 /// A set of `usize` elements represented by a bit vector. blocks required is proportional to the
 /// maximum element in the set.
 pub struct IdSet {
-    blocks: Vec<Block>,
+    blocks: BlockStore,
     len: usize,
 }
 
@@ -39,7 +43,7 @@ impl IdSet {
     /// Creates an empty `IdSet`.
     pub fn new() -> Self {
         IdSet {
-            blocks: Vec::new(),
+            blocks: BlockStore::new(),
             len: 0,
         }
     }
@@ -48,10 +52,14 @@ impl IdSet {
     /// Creates a `IdSet` filled with all elements from 0 to n.
     pub fn new_filled(n: usize) -> Self {
         let (nwords, nbits) = (n / BITS, n % BITS);
-        let mut blocks = vec![!0; nwords];
-        if nbits != 0 {
-            blocks.push(mask(nbits) - 1);
-        }
+        let blocks: BlockStore = if nbits != 0 {
+            iter::repeat(!0)
+                .take(nwords)
+                .chain(iter::once(mask(nbits) - 1))
+                .collect()
+        } else {
+            iter::repeat(!0).take(nwords).collect()
+        };
         IdSet { blocks, len: n }
     }
 
@@ -59,14 +67,14 @@ impl IdSet {
     /// Creates a empty `IdSet` that can hold elements up to n before reallocating.
     pub fn with_capacity(n: usize) -> Self {
         IdSet {
-            blocks: Vec::with_capacity(ceil_div(n, BITS)),
+            blocks: BlockStore::with_capacity(ceil_div(n, BITS)),
             len: 0,
         }
     }
 
     #[cfg(test)]
     fn from_bytes(bytes: &[Block]) -> Self {
-        let blocks = Vec::from(bytes);
+        let blocks = BlockStore::from_iter(bytes);
         let len = bytes
             .iter()
             .map(|&word| word.count_ones() as usize)
@@ -105,12 +113,6 @@ impl IdSet {
     #[inline]
     /// Resizes the set such that `capacity()` is minimal.
     pub fn shrink_to_fit(&mut self) {
-        while let Some(&block) = self.blocks.last() {
-            if block == 0 {
-                break;
-            }
-            self.blocks.pop();
-        }
         self.blocks.shrink_to_fit();
     }
 
@@ -136,7 +138,7 @@ impl IdSet {
                 false
             }
         } else {
-            self.blocks.resize(word + 1, 0);
+            self.blocks.resize(word + 1);
             self.blocks[word] = mask;
             self.len += 1;
             true
@@ -178,7 +180,7 @@ impl IdSet {
     /// Remove all elements that don't satisfy the predicate.
     pub fn retain<F: FnMut(Id) -> bool>(&mut self, mut pred: F) {
         let mut id = 0;
-        for word in &mut self.blocks {
+        for word in self.blocks.iter_mut() {
             for bit in 0..BITS {
                 let mask = mask(bit);
                 if (*word & mask) != 0 && !pred(id) {
@@ -217,20 +219,20 @@ impl IdSet {
 
     #[inline]
     /// An iterator over the blocks of the underlying representation.
-    pub fn blocks(&self) -> Blocks {
-        Blocks { inner: self.blocks.iter() }
+    pub fn blocks(&self) -> store::Iter {
+        self.blocks.iter()
     }
 
     #[inline]
     /// A consuming iterator over the blocks of the underlying representation.
-    pub fn into_blocks(self) -> IntoBlocks {
-        IntoBlocks { inner: self.blocks.into_iter() }
+    pub fn into_blocks(self) -> store::IntoIter {
+        self.blocks.into_iter()
     }
 
     #[inline]
     /// Iterator over the union of two sets.
     /// Equivalent to `self.blocks().union(other.blocks()).into_id_iter()`.
-    pub fn union<'a>(&'a self, other: &'a Self) -> IdIter<Union<Blocks<'a>, Blocks<'a>>> {
+    pub fn union<'a>(&'a self, other: &'a Self) -> IdIter<Union<store::Iter<'a>, store::Iter<'a>>> {
         self.blocks().union(other.blocks()).into_id_iter()
     }
 
@@ -239,7 +241,7 @@ impl IdSet {
     /// Equivalent to `self.blocks().intersection(other.blocks()).into_id_iter()`.
     pub fn intersection<'a>(&'a self,
                             other: &'a Self)
-                            -> IdIter<Intersection<Blocks<'a>, Blocks<'a>>> {
+                            -> IdIter<Intersection<store::Iter<'a>, store::Iter<'a>>> {
         self.blocks()
             .intersection(other.blocks())
             .into_id_iter()
@@ -248,16 +250,19 @@ impl IdSet {
     #[inline]
     /// Iterator over the difference of two sets.
     /// Equivalent to `self.blocks().difference(other.blocks()).into_id_iter()`.
-    pub fn difference<'a>(&'a self, other: &'a Self) -> IdIter<Difference<Blocks<'a>, Blocks<'a>>> {
+    pub fn difference<'a>(&'a self,
+                          other: &'a Self)
+                          -> IdIter<Difference<store::Iter<'a>, store::Iter<'a>>> {
         self.blocks().difference(other.blocks()).into_id_iter()
     }
 
     #[inline]
     /// Iterator over the symmetric difference of two sets.
     /// Equivalent to `self.blocks().symmetric_difference(other.blocks()).into_id_iter()`.
-    pub fn symmetric_difference<'a>(&'a self,
-                                    other: &'a Self)
-                                    -> IdIter<SymmetricDifference<Blocks<'a>, Blocks<'a>>> {
+    pub fn symmetric_difference<'a>
+        (&'a self,
+         other: &'a Self)
+         -> IdIter<SymmetricDifference<store::Iter<'a>, store::Iter<'a>>> {
         self.blocks()
             .symmetric_difference(other.blocks())
             .into_id_iter()
@@ -265,7 +270,7 @@ impl IdSet {
 
     #[inline]
     /// Iterator over the complement of the set. This iterator will never return None.
-    pub fn complement(&self) -> IdIter<Complement<Blocks>> {
+    pub fn complement(&self) -> IdIter<Complement<store::Iter>> {
         self.blocks().complement().into_id_iter()
     }
 
@@ -282,7 +287,8 @@ impl IdSet {
             }
         }
         let len = &mut self.len;
-        self.blocks.extend(blocks.inspect(|block| *len += block.count_ones() as usize));
+        self.blocks
+            .extend(blocks.inspect(|block| *len += block.count_ones() as usize));
     }
 
     #[inline]
@@ -290,7 +296,7 @@ impl IdSet {
     pub fn intersect_with(&mut self, other: &Self) {
         let blocks = other.blocks();
         if blocks.len() < self.blocks.len() {
-            for block in self.blocks.drain(blocks.len()..) {
+            for block in self.blocks.drain(blocks.len()) {
                 self.len -= block.count_ones() as usize;
             }
         }
@@ -323,7 +329,8 @@ impl IdSet {
             }
         }
         let len = &mut self.len;
-        self.blocks.extend(blocks.inspect(|block| *len += block.count_ones() as usize));
+        self.blocks
+            .extend(blocks.inspect(|block| *len += block.count_ones() as usize));
     }
 
     #[inline]
@@ -439,7 +446,7 @@ impl<'a> IntoIterator for &'a IdSet {
 #[derive(Clone, Debug)]
 /// An iterator over all elements in increasing order.
 pub struct Iter<'a> {
-    inner: IdIter<Blocks<'a>>,
+    inner: IdIter<store::Iter<'a>>,
     len: usize,
 }
 
@@ -481,7 +488,7 @@ impl IntoIterator for IdSet {
 #[derive(Clone, Debug)]
 /// A consuming iterator over all elements in increasing order.
 pub struct IntoIter {
-    inner: IdIter<IntoBlocks>,
+    inner: IdIter<store::IntoIter>,
     len: usize,
 }
 
@@ -597,54 +604,6 @@ pub trait BlockIterator: Iterator<Item = Block> + Sized {
 }
 
 impl<I> BlockIterator for I where I: Iterator<Item = Block> {}
-
-#[derive(Clone, Debug)]
-/// An iterator over the blocks of the underlying representation.
-pub struct Blocks<'a> {
-    inner: slice::Iter<'a, Block>,
-}
-
-impl<'a> Iterator for Blocks<'a> {
-    type Item = Block;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next().map(|&block| block)
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.inner.size_hint()
-    }
-}
-
-impl<'a> ExactSizeIterator for Blocks<'a> {
-    fn len(&self) -> usize {
-        self.inner.len()
-    }
-}
-
-#[derive(Clone, Debug)]
-/// A consuming iterator over the blocks of the underlying representation.
-pub struct IntoBlocks {
-    inner: vec::IntoIter<Block>,
-}
-
-impl Iterator for IntoBlocks {
-    type Item = Block;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next()
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.inner.size_hint()
-    }
-}
-
-impl ExactSizeIterator for IntoBlocks {
-    fn len(&self) -> usize {
-        self.inner.len()
-    }
-}
 
 #[derive(Clone, Debug)]
 /// Takes the union of two block iterators.

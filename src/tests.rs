@@ -62,7 +62,7 @@ fn filled() {
     for n in 0..100 {
         let set = IdSet::new_filled(n);
         for k in 0..n {
-            assert!(set.contains(k));
+            assert!(set.contains(k), "not contained: {} < {}", k, n);
         }
         assert!(!set.contains(n));
     }
