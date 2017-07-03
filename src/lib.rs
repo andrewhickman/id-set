@@ -1,5 +1,35 @@
-//! A bit-set implementation for use in id-map. Notable differences from bit-set are the `IntoIter`
-//! struct and retain() methods.
+//! A bitset implementation that stores data on the stack for small sizes (elements less than 196)
+//! and keeps track of the element count. 
+//! 
+//! # Examples
+//!
+//! The API is generally similar to the of the bit-set crate.
+//!
+//! ```
+//! use id_set::IdSet;
+//!
+//! let mut set = IdSet::new();
+//! set.insert(42);
+//! assert!(set.contains(42));
+//! set.remove(42);
+//! assert_eq!(set.len(), 0);
+//! ```
+//!
+//! Additionally the `IdIter` struct provides iteration over the bits of any iterator over `Block`
+//! values, allowing iteration over unions, intersections, and differences of arbitrarily many sets.
+//!
+//! ```
+//! use id_set::IdSet;
+//!
+//! let a: IdSet = (0..15).collect();
+//! let b: IdSet = (10..20).collect();
+//! let c: IdSet = (0..5).collect();
+//!
+//! let expected: IdSet = (0..5).chain(10..15).collect();
+//! let actual: IdSet = a.intersection(b).union(c).iter().collect();
+//! assert_eq!(actual, expected);
+//! ```
+
 
 #![deny(missing_docs, missing_debug_implementations)]
 
@@ -113,7 +143,7 @@ impl IdSet {
     }
 
     #[inline]
-    /// Resizes the set such that `capacity()` is minimal.
+    /// Resizes the set to minimise allocations.
     pub fn shrink_to_fit(&mut self) {
         self.blocks.shrink_to_fit();
     }
@@ -258,7 +288,7 @@ impl IdSet {
     }
 
     #[inline]
-    /// Iterator over the complement of the set. This iterator will never return None.
+    /// Iterator over the complement of the set. This iterator will never return None and may overflow.
     pub fn complement(&self) -> IdIter<Complement<Blocks>> {
         self.blocks().complement().into_id_iter()
     }

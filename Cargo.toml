@@ -1,9 +1,9 @@
 [package]
 name = "id-set"
-description = "A bitset implementation that tracks its size and stores data on the stack for small sizes (elements smaller than 196). The API is mostly similar to bit-set but also includes `retain()` and `into_iter()`, as well as the ability to take unions, intersections etc of more than 2 sets."
+description = "A bitset implementation that stores data on the stack for small sizes."
 documentation = "https://docs.rs/id-set/"
 repository = "https://github.com/andrewhickman/id-set"
-license = "MIT"
-version = "0.1.11"
+license = "MIT/Apache-2.0"
+version = "0.1.12"
 keywords = ["data-structures", "bitset"]
 authors = ["Andrew Hickman <andrew.hickman1@sky.com>"]
