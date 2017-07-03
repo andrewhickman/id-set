@@ -1,13 +1,13 @@
-//! A bitset implementation that stores data on the stack for small sizes (elements less than 196)
-//! and keeps track of the element count.
+//! [`IdSet`] is a bitset implementation that stores data on the stack for small sizes (elements
+//! less than 196) and keeps track of the element count.
 //!
 //! # Examples
 //!
-//! The API is generally similar to the of the bit-set crate.
+//! The API is generally similar to that of the bit-set crate.
 //!
 //! ```
-//! use id_set::IdSet;
-//!
+//! # use id_set::IdSet;
+//! #
 //! let mut set = IdSet::new();
 //! set.insert(42);
 //! assert!(set.contains(42));
@@ -15,12 +15,12 @@
 //! assert_eq!(set.len(), 0);
 //! ```
 //!
-//! Additionally the `IdIter` struct provides iteration over the bits of any iterator over `Block`
+//! Additionally the [`IdIter`] struct provides iteration over the bits of any iterator over `Block`
 //! values, allowing iteration over unions, intersections, and differences of arbitrarily many sets.
 //!
 //! ```
-//! use id_set::IdSet;
-//!
+//! # use id_set::IdSet;
+//! #
 //! let a: IdSet = (0..15).collect();
 //! let b: IdSet = (10..20).collect();
 //! let c: IdSet = (0..5).collect();
@@ -29,6 +29,9 @@
 //! let actual: IdSet = a.intersection(&b).union(&c).collect();
 //! assert_eq!(actual, expected);
 //! ```
+//!
+//! [`IdSet`]: /struct.IdSet.html
+//! [`IdIter`]: /struct.IdIter.html
 
 #![deny(missing_docs, missing_debug_implementations)]
 
@@ -251,89 +254,103 @@ impl IdSet {
 
     #[inline]
     /// Takes the union of the set with another. Equivalent to `self | other`.
-    pub fn union<I: IntoBlockIter>(&self, other: I) -> BlockIter<Union<Blocks, I::Blocks>> {
+    pub fn union<I>(&self, other: I) -> BlockIter<Union<Blocks, I::Blocks>>
+        where I: IntoBlockIterator
+    {
         self | other
     }
 
     #[inline]
     /// Takes the intersection of the set with another. Equivalent to `self & other`.
-    pub fn intersection<I: IntoBlockIter>(&self,
-                                          other: I)
-                                          -> BlockIter<Intersection<Blocks, I::Blocks>> {
+    pub fn intersection<I>(&self, other: I) -> BlockIter<Intersection<Blocks, I::Blocks>>
+        where I: IntoBlockIterator
+    {
         self & other
     }
 
     #[inline]
     /// Takes the difference of the set with another. Equivalent to `self - other`.
-    pub fn difference<I: IntoBlockIter>(&self,
-                                        other: I)
-                                        -> BlockIter<Difference<Blocks, I::Blocks>> {
+    pub fn difference<I>(&self, other: I) -> BlockIter<Difference<Blocks, I::Blocks>>
+        where I: IntoBlockIterator
+    {
         self - other
     }
 
     #[inline]
     /// Takes the symmetric difference of the set with another. Equivalent to `self ^ other`.
-    pub fn symmetric_difference<I: IntoBlockIter>
-        (&self,
-         other: I)
-         -> BlockIter<SymmetricDifference<Blocks, I::Blocks>> {
+    pub fn symmetric_difference<I>(&self,
+                                   other: I)
+                                   -> BlockIter<SymmetricDifference<Blocks, I::Blocks>>
+        where I: IntoBlockIterator
+    {
         self ^ other
     }
 
     #[inline]
     /// Consumes the set and takes the union with another.
-    pub fn into_union<I: IntoBlockIter>(self, other: I) -> BlockIter<Union<IntoBlocks, I::Blocks>> {
+    pub fn into_union<I>(self, other: I) -> BlockIter<Union<IntoBlocks, I::Blocks>>
+        where I: IntoBlockIterator
+    {
         self | other
     }
 
     #[inline]
     /// Consumes the set and takes the intersection with another.
-    pub fn into_intersection<I: IntoBlockIter>
-        (self,
-         other: I)
-         -> BlockIter<Intersection<IntoBlocks, I::Blocks>> {
+    pub fn into_intersection<I>(self, other: I) -> BlockIter<Intersection<IntoBlocks, I::Blocks>>
+        where I: IntoBlockIterator
+    {
         self & other
     }
 
     #[inline]
     /// Consumes the set and takes the difference with another.
-    pub fn into_difference<I: IntoBlockIter>(self,
-                                             other: I)
-                                             -> BlockIter<Difference<IntoBlocks, I::Blocks>> {
+    pub fn into_difference<I: IntoBlockIterator>
+        (self,
+         other: I)
+         -> BlockIter<Difference<IntoBlocks, I::Blocks>> {
         self - other
     }
 
     #[inline]
     /// Consumes the set and takes the symmetric difference with another.
-    pub fn into_symmetric_difference<I: IntoBlockIter>
-        (self,
-         other: I)
-         -> BlockIter<SymmetricDifference<IntoBlocks, I::Blocks>> {
+    pub fn into_symmetric_difference<I>(self,
+                                        other: I)
+                                        -> BlockIter<SymmetricDifference<IntoBlocks, I::Blocks>>
+        where I: IntoBlockIterator
+    {
         self ^ other
     }
 
     #[inline]
     /// Take the union of the set inplace with another set. Equivalent to `*self |= other`.
-    pub fn inplace_union(&mut self, other: &Self) {
+    pub fn inplace_union<I>(&mut self, other: I)
+        where I: IntoBlockIterator
+    {
         *self |= other
     }
 
     #[inline]
     /// Take the intersection of the set inplace with another set. Equivalent to `*self &= other`.
-    pub fn inplace_intersection(&mut self, other: &Self) {
+    pub fn inplace_intersection<I>(&mut self, other: I)
+        where I: IntoBlockIterator
+    {
         *self &= other
     }
 
     #[inline]
     /// Take the difference of the set inplace with another set. Equivalent to `*self -= other`.
-    pub fn inplace_difference(&mut self, other: &Self) {
+    pub fn inplace_difference<I>(&mut self, other: I)
+        where I: IntoBlockIterator
+    {
         *self -= other
     }
 
     #[inline]
     /// Take the symmetric difference of the set inplace with another set. Equivalent to
     /// `*self ^= other`.
-    pub fn inplace_symmetric_difference(&mut self, other: &Self) {
+    pub fn inplace_symmetric_difference<I>(&mut self, other: I)
+        where I: IntoBlockIterator
+    {
         *self ^= other
     }
 
@@ -538,7 +555,7 @@ impl<B> IdIter<B>
     where B: ExactSizeIterator<Item = Block>
 {
     /// Creates a new iterator over elements of a block iterator.
-    pub fn new<I: IntoBlockIter<Blocks = B>>(iter: I) -> Self {
+    pub fn new<I: IntoBlockIterator<Blocks = B>>(iter: I) -> Self {
         let mut blocks = iter.into_block_iter().into_inner();
         let word = blocks.next().unwrap_or(0);
         IdIter {
@@ -593,6 +610,12 @@ impl<B> BlockIter<B> {
 impl<B> BlockIter<B>
     where B: ExactSizeIterator<Item = Block>
 {
+    /// Creates new block iterator.
+    pub fn new(inner: B) -> Self {
+        BlockIter { inner }
+    }
+
+    #[inline]
     /// Equivalent to `self.into_iter().collect()`.
     pub fn collect<T>(self) -> T
         where T: iter::FromIterator<Id>
@@ -600,29 +623,38 @@ impl<B> BlockIter<B>
         self.into_iter().collect()
     }
 
+    #[inline]
     /// Takes the union of the blocks with another block iterator. Equivalent to `self | other`.
-    pub fn union<I: IntoBlockIter>(self, other: I) -> BlockIter<Union<B, I::Blocks>> {
+    pub fn union<I>(self, other: I) -> BlockIter<Union<B, I::Blocks>>
+        where I: IntoBlockIterator
+    {
         self | other
     }
 
-    /// Takes the intersection of the blocks with another block iterator. Equivalent to 
+    #[inline]
+    /// Takes the intersection of the blocks with another block iterator. Equivalent to
     /// `self & other`.
-    pub fn intersection<I: IntoBlockIter>(self, other: I) -> BlockIter<Intersection<B, I::Blocks>> {
+    pub fn intersection<I>(self, other: I) -> BlockIter<Intersection<B, I::Blocks>>
+        where I: IntoBlockIterator
+    {
         self & other
     }
 
-    /// Takes the difference of the blocks with another block iterator. Equivalent to 
+    #[inline]
+    /// Takes the difference of the blocks with another block iterator. Equivalent to
     /// `self - other`.
-    pub fn difference<I: IntoBlockIter>(self, other: I) -> BlockIter<Difference<B, I::Blocks>> {
+    pub fn difference<I>(self, other: I) -> BlockIter<Difference<B, I::Blocks>>
+        where I: IntoBlockIterator
+    {
         self - other
     }
 
-    /// Takes the symmetric difference of the blocks with another block iterator. Equivalent to 
+    #[inline]
+    /// Takes the symmetric difference of the blocks with another block iterator. Equivalent to
     /// `self ^ other`.
-    pub fn symmetric_difference<I: IntoBlockIter>
-        (self,
-         other: I)
-         -> BlockIter<SymmetricDifference<B, I::Blocks>> {
+    pub fn symmetric_difference<I>(self, other: I) -> BlockIter<SymmetricDifference<B, I::Blocks>>
+        where I: IntoBlockIterator
+    {
         self ^ other
     }
 }
@@ -639,7 +671,7 @@ impl<B> IntoIterator for BlockIter<B>
 }
 
 /// Conversion into an iterator over blocks.
-pub trait IntoBlockIter {
+pub trait IntoBlockIterator {
     /// The raw iterator type.
     type Blocks: ExactSizeIterator<Item = Block>;
 
@@ -647,7 +679,7 @@ pub trait IntoBlockIter {
     fn into_block_iter(self) -> BlockIter<Self::Blocks>;
 }
 
-impl<B> IntoBlockIter for B
+impl<B> IntoBlockIterator for B
     where B: ExactSizeIterator<Item = Block>
 {
     type Blocks = B;
@@ -657,7 +689,7 @@ impl<B> IntoBlockIter for B
     }
 }
 
-impl<B> IntoBlockIter for BlockIter<B>
+impl<B> IntoBlockIterator for BlockIter<B>
     where B: ExactSizeIterator<Item = Block>
 {
     type Blocks = B;
@@ -668,7 +700,7 @@ impl<B> IntoBlockIter for BlockIter<B>
     }
 }
 
-impl<'a> IntoBlockIter for &'a IdSet {
+impl<'a> IntoBlockIterator for &'a IdSet {
     type Blocks = Blocks<'a>;
 
     #[inline]
@@ -677,7 +709,7 @@ impl<'a> IntoBlockIter for &'a IdSet {
     }
 }
 
-impl IntoBlockIter for IdSet {
+impl IntoBlockIterator for IdSet {
     type Blocks = IntoBlocks;
 
     #[inline]
@@ -688,7 +720,7 @@ impl IntoBlockIter for IdSet {
 
 impl<B, I> ops::BitAnd<I> for BlockIter<B>
     where B: ExactSizeIterator<Item = Block>,
-          I: IntoBlockIter
+          I: IntoBlockIterator
 {
     type Output = BlockIter<Intersection<B, I::Blocks>>;
 
@@ -706,7 +738,7 @@ impl<B, I> ops::BitAnd<I> for BlockIter<B>
 
 impl<B, I> ops::BitOr<I> for BlockIter<B>
     where B: ExactSizeIterator<Item = Block>,
-          I: IntoBlockIter
+          I: IntoBlockIterator
 {
     type Output = BlockIter<Union<B, I::Blocks>>;
 
@@ -724,7 +756,7 @@ impl<B, I> ops::BitOr<I> for BlockIter<B>
 
 impl<B, I> ops::BitXor<I> for BlockIter<B>
     where B: ExactSizeIterator<Item = Block>,
-          I: IntoBlockIter
+          I: IntoBlockIterator
 {
     type Output = BlockIter<SymmetricDifference<B, I::Blocks>>;
 
@@ -742,7 +774,7 @@ impl<B, I> ops::BitXor<I> for BlockIter<B>
 
 impl<B, I> ops::Sub<I> for BlockIter<B>
     where B: ExactSizeIterator<Item = Block>,
-          I: IntoBlockIter
+          I: IntoBlockIterator
 {
     type Output = BlockIter<Difference<B, I::Blocks>>;
 
@@ -759,7 +791,7 @@ impl<B, I> ops::Sub<I> for BlockIter<B>
 }
 
 impl<'a, I> ops::BitAnd<I> for &'a IdSet
-    where I: IntoBlockIter
+    where I: IntoBlockIterator
 {
     type Output = BlockIter<Intersection<Blocks<'a>, I::Blocks>>;
 
@@ -771,7 +803,7 @@ impl<'a, I> ops::BitAnd<I> for &'a IdSet
 }
 
 impl<'a, I> ops::BitOr<I> for &'a IdSet
-    where I: IntoBlockIter
+    where I: IntoBlockIterator
 {
     type Output = BlockIter<Union<Blocks<'a>, I::Blocks>>;
 
@@ -783,7 +815,7 @@ impl<'a, I> ops::BitOr<I> for &'a IdSet
 }
 
 impl<'a, I> ops::BitXor<I> for &'a IdSet
-    where I: IntoBlockIter
+    where I: IntoBlockIterator
 {
     type Output = BlockIter<SymmetricDifference<Blocks<'a>, I::Blocks>>;
 
@@ -795,7 +827,7 @@ impl<'a, I> ops::BitXor<I> for &'a IdSet
 }
 
 impl<'a, I> ops::Sub<I> for &'a IdSet
-    where I: IntoBlockIter
+    where I: IntoBlockIterator
 {
     type Output = BlockIter<Difference<Blocks<'a>, I::Blocks>>;
 
@@ -807,7 +839,7 @@ impl<'a, I> ops::Sub<I> for &'a IdSet
 }
 
 impl<I> ops::BitAnd<I> for IdSet
-    where I: IntoBlockIter
+    where I: IntoBlockIterator
 {
     type Output = BlockIter<Intersection<IntoBlocks, I::Blocks>>;
 
@@ -819,7 +851,7 @@ impl<I> ops::BitAnd<I> for IdSet
 }
 
 impl<I> ops::BitOr<I> for IdSet
-    where I: IntoBlockIter
+    where I: IntoBlockIterator
 {
     type Output = BlockIter<Union<IntoBlocks, I::Blocks>>;
 
@@ -831,7 +863,7 @@ impl<I> ops::BitOr<I> for IdSet
 }
 
 impl<I> ops::BitXor<I> for IdSet
-    where I: IntoBlockIter
+    where I: IntoBlockIterator
 {
     type Output = BlockIter<SymmetricDifference<IntoBlocks, I::Blocks>>;
 
@@ -843,7 +875,7 @@ impl<I> ops::BitXor<I> for IdSet
 }
 
 impl<I> ops::Sub<I> for IdSet
-    where I: IntoBlockIter
+    where I: IntoBlockIterator
 {
     type Output = BlockIter<Difference<IntoBlocks, I::Blocks>>;
 
@@ -855,7 +887,7 @@ impl<I> ops::Sub<I> for IdSet
 }
 
 impl<I> ops::BitAndAssign<I> for IdSet
-    where I: IntoBlockIter
+    where I: IntoBlockIterator
 {
     #[inline]
     /// Takes the inplace intersection of the set with another.
@@ -874,7 +906,7 @@ impl<I> ops::BitAndAssign<I> for IdSet
 }
 
 impl<I> ops::BitOrAssign<I> for IdSet
-    where I: IntoBlockIter
+    where I: IntoBlockIterator
 {
     #[inline]
     /// Takes the inplace union of the set with another.
@@ -895,7 +927,7 @@ impl<I> ops::BitOrAssign<I> for IdSet
 }
 
 impl<I> ops::BitXorAssign<I> for IdSet
-    where I: IntoBlockIter
+    where I: IntoBlockIterator
 {
     #[inline]
     /// Takes the inplace symmetric difference of the set with another.
@@ -917,7 +949,7 @@ impl<I> ops::BitXorAssign<I> for IdSet
 }
 
 impl<I> ops::SubAssign<I> for IdSet
-    where I: IntoBlockIter
+    where I: IntoBlockIterator
 {
     #[inline]
     /// Takes the inplace difference of the set with another.
