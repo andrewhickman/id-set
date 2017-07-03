@@ -140,7 +140,7 @@ impl Extend<Block> for BlockStore {
             Stack(arr) => arr,
             Heap(ref mut vec) => return vec.extend(iter),
         };
-        let mut vec = Vec::with_capacity(SIZE + iter.size_hint().0);
+        let mut vec = Vec::with_capacity(SIZE.saturating_add(iter.size_hint().0));
         vec.extend(&arr);
         vec.extend(iter);
         *self = Heap(vec);
@@ -190,7 +190,7 @@ impl iter::FromIterator<Block> for BlockStore {
                 }
             }
             if let Some(block) = iter.next() {
-                let mut vec = Vec::with_capacity(SIZE + 1 + iter.size_hint().0);
+                let mut vec = Vec::with_capacity((SIZE + 1).saturating_add(iter.size_hint().0));
                 vec.extend(&arr);
                 vec.push(block);
                 vec.extend(iter);

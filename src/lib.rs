@@ -25,9 +25,8 @@
 //! let b: IdSet = (10..20).collect();
 //! let c: IdSet = (0..5).collect();
 //!
-//! let expected: IdSet = (0..5).chain(10..15).collect();
-//! let actual: IdSet = a.intersection(&b).union(&c).collect();
-//! assert_eq!(actual, expected);
+//! assert_eq!(a.intersection(b.union(&c)).collect::<Vec<_>>(),
+//!            a.intersection(&b).union(a.intersection(&c)).collect::<Vec<_>>());
 //! ```
 //!
 //! [`IdSet`]: /struct.IdSet.html
@@ -68,6 +67,8 @@ fn ceil_div(n: usize, k: usize) -> usize {
 /// maximum element in the set.
 pub struct IdSet {
     blocks: BlockStore,
+    // The number of set bits in the set. Since all elements are distinct usize values, it can
+    // always fit in a usize.
     len: usize,
 }
 
@@ -131,10 +132,7 @@ impl IdSet {
     /// Returns capacity of the set. Inserting any elements less than this will not cause
     /// reallocation.
     pub fn capacity(&self) -> usize {
-        self.blocks
-            .capacity()
-            .checked_mul(BITS)
-            .unwrap_or(usize::MAX)
+        self.blocks.capacity().saturating_mul(BITS)
     }
 
     #[inline]
@@ -226,7 +224,7 @@ impl IdSet {
     }
 
     #[inline]
-    /// Returns a slice of the underlying blocks.
+    /// Returns the underlying blocks as a slice.
     pub fn as_blocks(&self) -> &[Block] {
         &self.blocks
     }
@@ -304,10 +302,9 @@ impl IdSet {
 
     #[inline]
     /// Consumes the set and takes the difference with another.
-    pub fn into_difference<I: IntoBlockIterator>
-        (self,
-         other: I)
-         -> BlockIter<Difference<IntoBlocks, I::Blocks>> {
+    pub fn into_difference<I>(self, other: I) -> BlockIter<Difference<IntoBlocks, I::Blocks>>
+        where I: IntoBlockIterator
+    {
         self - other
     }
 
@@ -357,7 +354,7 @@ impl IdSet {
     #[inline]
     /// Returns true if the sets are disjoint.
     pub fn is_disjoint(&self, other: &Self) -> bool {
-        self.len() + other.len() < cmp::max(self.capacity(), other.capacity()) &&
+        self.len().saturating_add(other.len()) < cmp::max(self.capacity(), other.capacity()) &&
         self.intersection(other).into_iter().count() == 0
     }
 
@@ -589,7 +586,7 @@ impl<B> Iterator for IdIter<B>
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         let ones = self.word.count_ones() as usize;
-        (ones, Some(self.blocks.len() * BITS + ones))
+        (ones, Some(self.blocks.len().saturating_mul(BITS).saturating_add(ones)))
     }
 }
 
