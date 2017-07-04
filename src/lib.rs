@@ -29,10 +29,10 @@
 //!            a.intersection(&b).union(a.intersection(&c)).collect::<Vec<_>>());
 //! ```
 //!
-//! [`IdSet`]: /struct.IdSet.html
-//! [`IdIter`]: /struct.IdIter.html
+//! [`IdSet`]: struct.IdSet.html
+//! [`IdIter`]: struct.IdIter.html
 
-#![deny(missing_docs, missing_debug_implementations)]
+#![deny(missing_docs, missing_copy_implementations, missing_debug_implementations)]
 
 #[cfg(test)]
 mod tests;
@@ -142,7 +142,7 @@ impl IdSet {
     }
 
     #[inline]
-    /// Resizes the set to minimise allocations.
+    /// Resizes the set to minimise allocated memory.
     pub fn shrink_to_fit(&mut self) {
         self.blocks.shrink_to_fit();
     }
@@ -155,7 +155,7 @@ impl IdSet {
     }
 
     #[inline]
-    /// Inserts the given elements into the set, returning true if it was not already in the set.
+    /// Inserts the given element into the set, returning true if it was not already in the set.
     pub fn insert(&mut self, id: Id) -> bool {
         let (word, bit) = (id / BITS, id % BITS);
         let mask = mask(bit);
@@ -618,6 +618,16 @@ impl<B> BlockIter<B>
         where T: iter::FromIterator<Id>
     {
         self.into_iter().collect()
+    }
+
+    #[inline]
+    /// Collects the iterator into an `IdSet`.
+    pub fn into_set(self) -> IdSet {
+        let mut len = 0;
+        let blocks = self.inner.inspect(|&block| len += block.count_ones() as usize).collect();
+        IdSet {
+            blocks, len,
+        }
     }
 
     #[inline]

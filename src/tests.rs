@@ -364,3 +364,17 @@ fn inplace_symmetric_difference() {
     assert_eq!(a.len(), 2);
     assert_eq!(b.len(), 2);
 }
+
+#[test]
+fn block_iter_into_set() {
+    let a: IdSet = (0..15).collect();
+    let b: IdSet = (10..20).collect();
+    let c: IdSet = (0..5).collect();
+
+    let iter = (&a | &b) ^ c;
+
+    let expected: IdSet = iter.clone().into_iter().collect();
+    let actual: IdSet = iter.into_set();
+
+    assert_eq!(expected, actual);
+}
