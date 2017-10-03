@@ -54,13 +54,23 @@ pub type Block = u32;
 /// The number of bits in the block type.
 pub const BITS: usize = 32;
 
+#[inline]
 fn mask(bit: usize) -> Block {
     (1 as Block) << bit
 }
 
 /// Given n and k return the largest integer m such that m*k <= n
+#[inline]
 fn ceil_div(n: usize, k: usize) -> usize {
     if n % k == 0 { n / k } else { n / k + 1 }
+}
+
+/// Remove the least significant bit and return its index.
+#[inline]
+fn pop_lsb(n: &mut Block) -> usize {
+    let idx = n.trailing_zeros() as usize;
+    *n &= *n - 1;
+    idx
 }
 
 /// A set of `usize` elements represented by a bit vector. Storage required is proportional to the
@@ -210,16 +220,22 @@ impl IdSet {
     #[inline]
     /// Remove all elements that don't satisfy the predicate.
     pub fn retain<F: FnMut(Id) -> bool>(&mut self, mut pred: F) {
-        let mut id = 0;
+        let mut idx = 0;
         for word in self.blocks.iter_mut() {
-            for bit in 0..BITS {
-                let mask = mask(bit);
-                if (*word & mask) != 0 && !pred(id) {
+            let mut block = *word;
+
+            while block != 0 {
+                let id = idx + block.trailing_zeros() as usize;
+                let mask = block - 1;
+
+                if !pred(id) {
                     self.len -= 1;
-                    *word &= !mask;
+                    *word &= mask;
                 }
-                id += 1;
+                block &= mask;
             }
+
+            idx += BITS;
         }
     }
 
@@ -577,10 +593,7 @@ impl<B> Iterator for IdIter<B>
             }
             self.idx += BITS;
         }
-        // remove the LSB of the current word
-        let bit = (self.word & (!self.word + 1)) - 1;
-        self.word &= self.word - 1;
-        Some(self.idx + bit.count_ones() as usize)
+        Some(self.idx + pop_lsb(&mut self.word))
     }
 
     #[inline]

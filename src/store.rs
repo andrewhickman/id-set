@@ -18,7 +18,7 @@ impl BlockStore {
     }
 
     pub fn with_capacity(cap: usize) -> Self {
-        if cap < SIZE {
+        if cap <= SIZE {
             Stack([0; SIZE])
         } else {
             Heap(Vec::with_capacity(cap))
@@ -42,7 +42,7 @@ impl BlockStore {
     }
 
     pub fn reserve(&mut self, cap: usize) {
-        if cap >= SIZE {
+        if SIZE < cap {
             let vec = match *self {
                 Stack(ref arr) => {
                     let mut vec = Vec::with_capacity(cap);
@@ -65,7 +65,7 @@ impl BlockStore {
                 while let Some(&0) = vec.last() {
                     vec.pop();
                 }
-                if vec.len() < SIZE {
+                if vec.len() <= SIZE {
                     let mut arr = [0; SIZE];
                     for i in 0..vec.len() {
                         arr[i] = vec[i];
